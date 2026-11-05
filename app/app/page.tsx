@@ -54,7 +54,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <Stat label="Encaissé ce mois" value={eur(paidMonth)} href="/app/factures" />
+        <Stat label="Encaissé ce mois" value={eur(paidMonth)} sub="Voir l'évolution →" href="/app/chiffre-affaires" />
         <Stat label="À encaisser" value={eur(unpaid.reduce((s, d) => s + Number(d.total_ttc), 0))} sub={late.length ? `⚠️ ${late.length} en retard` : `${unpaid.length} facture(s)`} href="/app/factures" />
         <Stat label="Devis en attente" value={pending.length} sub={eur(pending.reduce((s, d) => s + Number(d.total_ttc), 0))} href="/app/devis" />
         <Stat label="Signés à facturer" value={toInvoice.length} sub={eur(toInvoice.reduce((s, d) => s + Number(d.total_ttc), 0))} href="/app/devis" />
