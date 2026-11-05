@@ -3,10 +3,10 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { sb } from "@/lib/supabase";
 import { eur, STATUS_COLOR, STATUS_LABEL } from "@/lib/calc";
-import { useCompany } from "@/components/CompanyContext";
+import { memberName, useCompany } from "@/components/CompanyContext";
 import type { Doc } from "@/lib/types";
 
-export default function Dashboard() {
+function SupDashboard() {
   const { company } = useCompany();
   const [docs, setDocs] = useState<Doc[]>([]);
   const [next, setNext] = useState<any[]>([]);
@@ -86,6 +86,8 @@ export default function Dashboard() {
         </Link>
       )}
 
+      <TeamToday />
+
       {sites.length > 0 && (
         <section>
           <h2 className="mb-2 font-bold">Chantiers en cours</h2>
@@ -129,4 +131,144 @@ export default function Dashboard() {
       </section>
     </div>
   );
+}
+
+function TechHome() {
+  const { me, company } = useCompany();
+  const [today, setToday] = useState<any[]>([]);
+  const [upcoming, setUpcoming] = useState<any[]>([]);
+  const [sav, setSav] = useState<any[]>([]);
+  const [sites, setSites] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!me) return;
+    (async () => {
+      const s = sb();
+      const start = new Date(); start.setHours(0, 0, 0, 0);
+      const end = new Date(start); end.setDate(end.getDate() + 1);
+      const week = new Date(start); week.setDate(week.getDate() + 7);
+      const { data: iv } = await s.from("interventions").select("*, clients(name, phone)").eq("assigned_to", me.user_id)
+        .gte("starts_at", start.toISOString()).lt("starts_at", week.toISOString()).neq("status", "canceled").order("starts_at");
+      setToday((iv || []).filter((i: any) => new Date(i.starts_at) < end));
+      setUpcoming((iv || []).filter((i: any) => new Date(i.starts_at) >= end));
+      const { data: sv } = await s.from("sav_tickets").select("id, number, priority, problem, client_snapshot, scheduled_at, status").eq("assigned_to", me.user_id).not("status", "in", "(resolved,closed)").order("scheduled_at");
+      setSav(sv || []);
+      const { data: ch } = await s.from("chantiers").select("id, title, client_snapshot, team").eq("status", "in_progress").order("created_at", { ascending: false });
+      setSites((ch || []).filter((c: any) => !c.team?.length || c.team.includes(me.user_id)));
+    })();
+  }, [me]);
+
+  const Iv = ({ i }: { i: any }) => (
+    <div className={`card space-y-2 border-l-4 ${i.status === "done" ? "border-l-green-500 opacity-60" : "border-l-flame"}`}>
+      <p className="font-semibold">{new Date(i.starts_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · {i.title}</p>
+      <p className="text-sm text-slate-500">{[i.clients?.name, i.address].filter(Boolean).join(" · ")}</p>
+      {i.notes && <p className="text-sm">{i.notes}</p>}
+      <div className="flex gap-2">
+        {i.address && <a className="btn-ghost flex-1 !py-2 text-sm" target="_blank" rel="noreferrer" href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(i.address)}`}>🧭 Y aller</a>}
+        {i.clients?.phone && <a className="btn-ghost flex-1 !py-2 text-sm" href={`tel:${i.clients.phone}`}>📞 Appeler</a>}
+        {i.status !== "done" && <button className="btn-primary flex-1 !py-2 text-sm" onClick={async () => { await sb().from("interventions").update({ status: "done" }).eq("id", i.id); setToday(today.map((x) => (x.id === i.id ? { ...x, status: "done" } : x))); }}>✅ Fait</button>}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-5 p-4">
+      <div className="pt-2">
+        <p className="text-sm text-slate-500">{new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</p>
+        <h1 className="text-2xl font-extrabold">Bonjour {me?.full_name?.split(" ")[0] || ""} 👋</h1>
+        <p className="text-sm text-slate-500">{company?.name}</p>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <Link href="/app/chantiers" className="btn-brand flex-col !py-3 text-sm">📷<span>Photo chantier</span></Link>
+        <Link href="/app/entretien/visite/nouveau" className="btn-primary flex-col !py-3 text-sm">🔧<span>Entretien</span></Link>
+        <Link href="/app/sav/nouveau" className="btn-ghost flex-col !py-3 text-sm">🛠<span>SAV</span></Link>
+      </div>
+
+      <section>
+        <h2 className="mb-2 font-bold">Aujourd'hui ({today.length})</h2>
+        {today.length === 0 && <p className="text-sm text-slate-500">Aucune intervention prévue aujourd'hui.</p>}
+        <div className="space-y-2">{today.map((i) => <Iv key={i.id} i={i} />)}</div>
+      </section>
+
+      {sav.length > 0 && (
+        <section>
+          <h2 className="mb-2 font-bold">Mes SAV ({sav.length})</h2>
+          <div className="space-y-2">
+            {sav.map((t) => (
+              <Link key={t.id} href={`/app/sav/${t.id}`} className={`card block ${t.priority === "urgent" ? "border-l-4 border-l-red-500" : ""}`}>
+                <p className="font-semibold">{t.priority === "urgent" ? "🚨 " : ""}{t.client_snapshot?.name}</p>
+                <p className="line-clamp-1 text-sm text-slate-600">{t.problem}</p>
+                {t.scheduled_at && <p className="text-xs text-slate-400">RDV {new Date(t.scheduled_at).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</p>}
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {sites.length > 0 && (
+        <section>
+          <h2 className="mb-2 font-bold">Chantiers en cours</h2>
+          <div className="space-y-2">
+            {sites.map((c) => (
+              <Link key={c.id} href={`/app/chantiers/${c.id}`} className="card flex items-center justify-between py-3">
+                <div className="min-w-0"><p className="truncate font-semibold">🏗️ {c.title}</p><p className="truncate text-xs text-slate-500">{c.client_snapshot?.name}</p></div>
+                <span className="text-sm text-flame">📷 →</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {upcoming.length > 0 && (
+        <section>
+          <h2 className="mb-2 font-bold">Cette semaine</h2>
+          <div className="space-y-2">
+            {upcoming.map((i) => (
+              <Link key={i.id} href="/app/planning" className="card block py-3">
+                <p className="font-semibold">{i.title}</p>
+                <p className="text-sm text-slate-500">{new Date(i.starts_at).toLocaleString("fr-FR", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} · {i.clients?.name || i.address}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function TeamToday() {
+  const { team } = useCompany();
+  const [ivs, setIvs] = useState<any[]>([]);
+  useEffect(() => {
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    const end = new Date(start); end.setDate(end.getDate() + 1);
+    sb().from("interventions").select("id, title, starts_at, status, assigned_to, clients(name)").gte("starts_at", start.toISOString()).lt("starts_at", end.toISOString()).order("starts_at")
+      .then(({ data }) => setIvs(data || []));
+  }, []);
+  const techs = team.filter((m) => m.role === "technician");
+  if (!techs.length) return null;
+  return (
+    <section>
+      <div className="mb-2 flex items-center justify-between"><h2 className="font-bold">Équipe aujourd'hui</h2><Link href="/app/equipe" className="text-sm text-brand">Équipe →</Link></div>
+      <div className="space-y-2">
+        {techs.map((t) => {
+          const mine = ivs.filter((i) => i.assigned_to === t.user_id);
+          return (
+            <div key={t.user_id} className="card py-3">
+              <p className="font-semibold">👷 {memberName(t)} <span className="text-xs font-normal text-slate-500">· {mine.filter((i) => i.status === "done").length}/{mine.length} terminée(s)</span></p>
+              {mine.length === 0 ? <p className="text-sm text-slate-400">Aucune intervention</p> : mine.map((i) => (
+                <p key={i.id} className={`text-sm ${i.status === "done" ? "text-slate-400 line-through" : ""}`}>{new Date(i.starts_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} {i.title}{i.clients?.name ? ` — ${i.clients.name}` : ""}</p>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+export default function Home() {
+  const { isSup, loaded } = useCompany();
+  if (!loaded) return <p className="p-8 text-center text-slate-400">Chargement…</p>;
+  return isSup ? <SupDashboard /> : <TechHome />;
 }

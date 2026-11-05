@@ -18,6 +18,7 @@ export async function POST(req: Request) {
 
   const input = await req.json();
   const { docId, pdfBase64, to, origin } = input;
+  if (input.type === "invite") return sendInvite(s, input);
   if (["contract", "report", "renewal", "reception", "sav"].includes(input.type)) return sendMaintenance(s, input);
   const { data: doc } = await s.from("documents").select("*").eq("id", docId).single();
   if (!doc) return NextResponse.json({ error: "Document introuvable" }, { status: 404 });
@@ -140,4 +141,27 @@ async function sendMaintenance(s: any, body: any) {
   }
   const { data: updated } = await s.from(table).update({ sent_at: new Date().toISOString(), sent_to: email }).eq("id", id).select().single();
   return NextResponse.json({ ok: true, row: updated });
+}
+
+async function sendInvite(s: any, body: any) {
+  const { data: inv } = await s.from("invitations").select("*").eq("id", body.id).single();
+  if (!inv) return NextResponse.json({ error: "Invitation introuvable" }, { status: 404 });
+  const { data: co } = await s.from("companies").select("*").single();
+  const link = `${process.env.NEXT_PUBLIC_APP_URL || body.origin}/rejoindre/${inv.token}`;
+  const role = inv.role === "technician" ? "technicien" : "superviseur";
+  const html = `<div style="font-family:Arial,sans-serif;font-size:15px;color:#0f1b2d;max-width:560px">
+    ${co.logo_url ? `<img src="${co.logo_url}" alt="" style="max-height:60px;margin-bottom:16px">` : ""}
+    <p>Bonjour ${esc(inv.full_name || "")},</p>
+    <p><b>${esc(co.name)}</b> vous invite à rejoindre son équipe sur l'application de gestion de chantiers, en tant que <b>${role}</b>.</p>
+    <p style="margin:24px 0"><a href="${link}" style="background:#ea7a0c;color:#fff;padding:14px 22px;border-radius:10px;text-decoration:none;font-weight:bold">Créer mon accès</a></p>
+    <p style="font-size:13px;color:#64748b">Ouvrez ce lien sur votre téléphone. Ensuite, ajoutez l'appli à votre écran d'accueil depuis le menu du navigateur.</p></div>`;
+  const r = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: { "api-key": process.env.BREVO_API_KEY!, "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify({ sender: { name: co.name, email: process.env.EMAIL_FROM }, replyTo: co.email ? { email: co.email } : undefined,
+      to: [{ email: inv.email, name: inv.full_name || inv.email }], subject: `${co.name} vous invite à rejoindre son équipe`, htmlContent: html }),
+  });
+  if (!r.ok) { const j = await r.json().catch(() => ({})); return NextResponse.json({ error: `Envoi refusé : ${j.message || r.status}` }, { status: 502 }); }
+  await s.from("invitations").update({ sent_at: new Date().toISOString() }).eq("id", inv.id);
+  return NextResponse.json({ ok: true });
 }

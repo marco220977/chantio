@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { sb } from "@/lib/supabase";
 import { dateFr, eur } from "@/lib/calc";
 import Header from "@/components/Header";
+import { useCompany } from "@/components/CompanyContext";
 import { CONTRACT_STATUS, equipmentLabel, nextTerm, renewalNoticeDue, type Contract, type Report } from "@/lib/maintenance";
 
 function List() {
@@ -12,6 +13,7 @@ function List() {
   const [contracts, setContracts] = useState<Contract[] | null>(null);
   const [reports, setReports] = useState<Report[] | null>(null);
   const [q, setQ] = useState("");
+  const { isSup } = useCompany();
 
   useEffect(() => {
     sb().from("contracts").select("*").order("next_visit_date", { ascending: true, nullsFirst: false }).then(({ data }) => setContracts(data || []));
@@ -26,7 +28,7 @@ function List() {
 
   return (
     <>
-      <Header title="Entretien" right={
+      <Header title="Entretien" right={(tab !== "contrats" || isSup) &&
         <Link href={tab === "contrats" ? "/app/entretien/contrat/nouveau" : "/app/entretien/visite/nouveau"} className="btn-brand !px-3 !py-1.5 text-sm">＋ {tab === "contrats" ? "Contrat" : "Visite"}</Link>} />
       <div className="space-y-3 p-4">
         <div className="grid grid-cols-2 rounded-xl bg-slate-200 p-1">
@@ -45,7 +47,7 @@ function List() {
             ))}
           </div>
         )}
-        {tab === "contrats" && notices.length > 0 && (
+        {isSup && tab === "contrats" && notices.length > 0 && (
           <div className="card border-blue-200 bg-blue-50 text-sm">
             <p className="font-bold">📨 Avis de reconduction à envoyer ({notices.length})</p>
             <p className="text-slate-600">Obligatoire pour les particuliers entre 3 mois et 1 mois avant l'échéance (loi Chatel). Ouvrez le contrat et appuyez sur « Avis d'échéance ».</p>
@@ -64,7 +66,7 @@ function List() {
                 <p className="text-xs text-slate-400">{c.number || "Brouillon"}{c.status === "active" ? ` · échéance ${dateFr(nextTerm(c))}` : ""}{c.next_visit_date && c.status === "active" ? ` · visite ${dateFr(c.next_visit_date)}` : ""}</p>
               </div>
               <div className="text-right">
-                <p className="font-bold">{eur(c.price_ht)}<span className="text-xs font-normal text-slate-400"> HT/an</span></p>
+                {isSup && <p className="font-bold">{eur(c.price_ht)}<span className="text-xs font-normal text-slate-400"> HT/an</span></p>}
                 <span className={`chip mt-1 ${CONTRACT_STATUS[c.status]?.[1]}`}>{CONTRACT_STATUS[c.status]?.[0]}</span>
               </div>
             </Link>

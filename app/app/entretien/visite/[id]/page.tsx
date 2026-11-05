@@ -19,7 +19,7 @@ function Visit() {
   const { id } = useParams<{ id: string }>();
   const params = useSearchParams();
   const router = useRouter();
-  const { company } = useCompany();
+  const { company, isSup } = useCompany();
   const isNew = id === "nouveau";
   const [r, setR] = useState<Report | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
@@ -33,8 +33,9 @@ function Visit() {
     s.from("clients").select("*").order("name").then(({ data }) => setClients(data || []));
     if (!isNew) { s.from("maintenance_reports").select("*").eq("id", id).single().then(({ data }) => setR(data)); return; }
     (async () => {
-      const { data: me } = await s.from("members").select("full_name").limit(1).maybeSingle();
-      const base: Report = { id: "", status: "draft", equipment: {}, checklist: [], measures: {}, visit_date: addDays(0), technician: me?.full_name || "", client_id: params.get("client") };
+      const { data: { user } } = await s.auth.getUser();
+      const { data: me } = await s.from("members").select("full_name").eq("user_id", user?.id).maybeSingle();
+      const base: Report = { id: "", status: "draft", equipment: {}, checklist: [], measures: {}, visit_date: addDays(0), technician: me?.full_name || "", client_id: params.get("client"), assigned_to: user?.id } as Report;
       const cid = params.get("contract");
       if (cid) {
         const { data: c } = await s.from("contracts").select("*").eq("id", cid).single();
@@ -83,8 +84,7 @@ function Visit() {
   }
 
   async function validate(extra: Partial<Report>) {
-    const done = await save({ ...extra, status: "done" });
-    if (done?.contract_id && done.next_visit_date) await sb().from("contracts").update({ next_visit_date: done.next_visit_date }).eq("id", done.contract_id);
+    await save({ ...extra, status: "done" });
     setToast("✅ Attestation validée"); setTimeout(() => setToast(""), 3000);
   }
 
@@ -225,7 +225,7 @@ function Visit() {
             </div>
           )}
           {r.status === "done" && <button className="btn-primary w-full" disabled={busy} onClick={send}>📧 {r.sent_at ? "Renvoyer" : "Envoyer"} l'attestation par e-mail</button>}
-          {r.status === "done" && !r.contract_id && <button className="btn-ghost w-full" onClick={invoice}>💶 Facturer la visite</button>}
+          {isSup && r.status === "done" && !r.contract_id && <button className="btn-ghost w-full" onClick={invoice}>💶 Facturer la visite</button>}
           {editable && r.id && <button className="btn-danger w-full" onClick={async () => { if (confirm("Supprimer ce brouillon ?")) { await sb().from("maintenance_reports").delete().eq("id", r.id); router.replace("/app/entretien?tab=attestations"); } }}>Supprimer le brouillon</button>}
         </section>
       </div>

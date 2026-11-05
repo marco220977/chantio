@@ -31,7 +31,8 @@ function Editor() {
     s.from("clients").select("*").order("name").then(({ data }) => setClients(data || []));
     if (!isNew) { s.from("receptions").select("*").eq("id", id).single().then(({ data }) => setR(data)); return; }
     (async () => {
-      const { data: me } = await s.from("members").select("full_name").limit(1).maybeSingle();
+      const { data: { user } } = await s.auth.getUser();
+      const { data: me } = await s.from("members").select("full_name").eq("user_id", user?.id).maybeSingle();
       const base: Reception = { id: "", status: "draft", reserves: [], reception_date: addDays(0), works_end_date: addDays(0), company_signer: me?.full_name || "" };
       let docId = params.get("doc");
       const chId = params.get("chantier");

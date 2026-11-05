@@ -5,8 +5,9 @@ import { sb } from "@/lib/supabase";
 import Header from "@/components/Header";
 import Modal from "@/components/Modal";
 import type { Client } from "@/lib/types";
+import { memberName, useCompany } from "@/components/CompanyContext";
 
-type Iv = { id?: string; title: string; client_id?: string | null; document_id?: string | null; address?: string; starts_at: string; duration_min: number; technician?: string; status: string; notes?: string; clients?: { name: string; phone?: string } | null };
+type Iv = { id?: string; assigned_to?: string | null; title: string; client_id?: string | null; document_id?: string | null; address?: string; starts_at: string; duration_min: number; technician?: string; status: string; notes?: string; clients?: { name: string; phone?: string } | null };
 
 const startOfWeek = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
 const localInput = (iso: string) => { const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
@@ -17,6 +18,9 @@ function Planning() {
   const [list, setList] = useState<Iv[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [edit, setEdit] = useState<Iv | null>(null);
+  const { team, me, isSup } = useCompany();
+  const [who, setWho] = useState<string>("all");
+  useEffect(() => { if (me && !isSup) setWho(me.user_id); }, [me, isSup]);
 
   const load = async () => {
     const end = new Date(week); end.setDate(end.getDate() + 7);
@@ -47,7 +51,7 @@ function Planning() {
 
   const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(week); d.setDate(d.getDate() + i); return d; });
   const shift = (n: number) => { const d = new Date(week); d.setDate(d.getDate() + 7 * n); setWeek(d); };
-  const newAt = (d: Date) => { const x = new Date(d); x.setHours(8, 0, 0, 0); setEdit({ title: "", starts_at: x.toISOString(), duration_min: 120, status: "planned" }); };
+  const newAt = (d: Date) => { const x = new Date(d); x.setHours(8, 0, 0, 0); setEdit({ title: "", starts_at: x.toISOString(), duration_min: 120, status: "planned", assigned_to: who !== "all" && who !== "none" ? who : isSup ? null : me?.user_id, technician: (() => { const m = team.find((t) => t.user_id === (who !== "all" && who !== "none" ? who : isSup ? "" : me?.user_id)); return m ? memberName(m) : ""; })() }); };
 
   return (
     <>
@@ -59,10 +63,17 @@ function Planning() {
         </button>
         <button className="btn-ghost !px-3 !py-1.5" onClick={() => shift(1)}>›</button>
       </div>
+      {team.length > 1 && (
+        <div className="-mb-2 flex gap-1.5 overflow-x-auto px-4 pt-3">
+          {[["all", "Tous"], ...(me ? [[me.user_id, "Moi"]] : []), ...team.filter((m) => m.user_id !== me?.user_id).map((m) => [m.user_id, memberName(m).split(" ")[0]]), ...(isSup ? [["none", "Non attribué"]] : [])].map(([k, l]) => (
+            <button key={k} onClick={() => setWho(k)} className={`chip whitespace-nowrap border py-1.5 ${who === k ? "border-ink bg-ink text-white" : "border-slate-200 bg-white"}`}>{l}</button>
+          ))}
+        </div>
+      )}
       <div className="space-y-3 p-4">
         {days.map((d) => {
           const key = d.toDateString();
-          const items = list.filter((i) => new Date(i.starts_at).toDateString() === key);
+          const items = list.filter((i) => new Date(i.starts_at).toDateString() === key && (who === "all" || (who === "none" ? !i.assigned_to : i.assigned_to === who)));
           const today = key === new Date().toDateString();
           return (
             <div key={key}>
@@ -74,7 +85,8 @@ function Planning() {
               {items.map((i) => (
                 <button key={i.id} onClick={() => setEdit(i)} className={`card mb-2 block w-full border-l-4 text-left ${i.status === "done" ? "border-l-green-500 opacity-60" : i.status === "canceled" ? "border-l-red-400 opacity-50" : "border-l-flame"}`}>
                   <p className="font-semibold">{new Date(i.starts_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · {i.title}</p>
-                  <p className="text-sm text-slate-500">{[i.clients?.name, i.address, i.technician].filter(Boolean).join(" · ")}</p>
+                  <p className="text-sm text-slate-500">{[i.clients?.name, i.address].filter(Boolean).join(" · ")}</p>
+                  <p className="text-xs text-slate-400">👷 {i.technician || "Non attribué"}</p>
                 </button>
               ))}
             </div>
@@ -99,7 +111,11 @@ function Planning() {
                 {[30, 60, 90, 120, 180, 240, 480].map((m) => <option key={m} value={m}>{m < 60 ? `${m} min` : `${m / 60} h`}</option>)}
               </select>
             </div>
-            <input className="input" placeholder="Technicien" value={edit.technician || ""} onChange={(e) => setEdit({ ...edit, technician: e.target.value })} />
+            <div><label className="label">Attribué à</label>
+              <select className="input" value={edit.assigned_to || ""} onChange={(e) => { const m = team.find((x) => x.user_id === e.target.value); setEdit({ ...edit, assigned_to: e.target.value || null, technician: m ? memberName(m) : "" }); }}>
+                <option value="">— Non attribué —</option>
+                {team.map((m) => <option key={m.user_id} value={m.user_id}>{memberName(m)}{m.role === "technician" ? " (technicien)" : ""}</option>)}
+              </select></div>
             <textarea className="input" rows={2} placeholder="Notes" value={edit.notes || ""} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} />
             <select className="input" value={edit.status} onChange={(e) => setEdit({ ...edit, status: e.target.value })}>
               <option value="planned">Prévue</option><option value="done">Terminée</option><option value="canceled">Annulée</option>

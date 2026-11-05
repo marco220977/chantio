@@ -21,7 +21,7 @@ export type Ticket = {
   warranty?: string; problem?: string; scheduled_at?: string | null; technician?: string; diagnosis?: string;
   actions?: string; parts?: string; billable?: boolean; photos: string[]; resolved_at?: string | null;
   signed_at?: string; signer_name?: string; signature_data?: string; document_id?: string | null;
-  sent_at?: string; sent_to?: string; created_at?: string;
+  sent_at?: string; sent_to?: string; created_at?: string; assigned_to?: string | null;
 };
 
 export const SAV_STATUS: Record<string, [string, string]> = {

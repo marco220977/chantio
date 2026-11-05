@@ -357,3 +357,9 @@ create policy chantiers_delete on storage.objects for delete to authenticated us
 
 -- ---------- V1.7 : désabonnement et suppression de compte ----------
 -- colonne companies.cancel_at, fonction delete_my_account() (voir migration "account_deletion_and_cancel")
+
+-- ---------- V1.8 : rôles superviseur / technicien ----------
+-- voir migration "roles_supervisor_technician" : members.email, my_role(), is_supervisor(), table invitations,
+-- handle_new_user() avec jeton d'invitation, set_member_role(), remove_member(), update_my_name(),
+-- assigned_to (interventions, sav_tickets, maintenance_reports), chantiers.team, RLS par rôle,
+-- trigger report_done_update_contract

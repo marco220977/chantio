@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { sb } from "@/lib/supabase";
 import { dateFr } from "@/lib/calc";
 import Header from "@/components/Header";
+import { useCompany } from "@/components/CompanyContext";
 import { CH_STATUS, signedUrls, type Chantier } from "@/lib/chantiers";
 
 export default function Chantiers() {
@@ -11,6 +12,9 @@ export default function Chantiers() {
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [status, setStatus] = useState("active");
   const [q, setQ] = useState("");
+  const { me, isSup } = useCompany();
+  const [mine, setMine] = useState(false);
+  useEffect(() => { if (me && !isSup) setMine(true); }, [me, isSup]);
 
   useEffect(() => {
     (async () => {
@@ -22,7 +26,7 @@ export default function Chantiers() {
     })();
   }, []);
 
-  const shown = (list || []).filter((c) => (status === "all" || (status === "active" ? c.status !== "done" : c.status === "done"))
+  const shown = (list || []).filter((c: any) => !mine || !c.team?.length || c.team.includes(me?.user_id)).filter((c) => (status === "all" || (status === "active" ? c.status !== "done" : c.status === "done"))
     && (!q || `${c.title} ${c.client_snapshot?.name} ${c.address}`.toLowerCase().includes(q.toLowerCase())));
 
   return (
@@ -35,6 +39,7 @@ export default function Chantiers() {
           ))}
         </div>
         <input className="input" placeholder="Rechercher (client, adresse)…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} /> Seulement mes chantiers</label>
         {list === null && <p className="text-center text-slate-400">Chargement…</p>}
         {list && shown.length === 0 && <p className="py-10 text-center text-slate-500">Aucun chantier.</p>}
         {shown.map((c) => (

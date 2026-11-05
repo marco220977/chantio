@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { sb } from "@/lib/supabase";
 import { addDays, dateFr } from "@/lib/calc";
-import { useCompany } from "@/components/CompanyContext";
+import { memberName, useCompany } from "@/components/CompanyContext";
 import Header from "@/components/Header";
 import Modal from "@/components/Modal";
 import SignaturePad from "@/components/SignaturePad";
@@ -22,7 +22,7 @@ function Editor() {
   const { id } = useParams<{ id: string }>();
   const params = useSearchParams();
   const router = useRouter();
-  const { company } = useCompany();
+  const { company, team, me, isSup } = useCompany();
   const isNew = id === "nouveau";
   const [t, setT] = useState<Ticket | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
@@ -42,8 +42,10 @@ function Editor() {
       return;
     }
     (async () => {
-      const { data: me } = await s.from("members").select("full_name").limit(1).maybeSingle();
-      const base: Ticket = { id: "", status: "open", priority: "normal", origin: "Téléphone", equipment: {}, photos: [], warranty: "hors_garantie", technician: me?.full_name || "", client_id: params.get("client") || null };
+      const { data: { user } } = await s.auth.getUser();
+      const { data: mine } = await s.from("members").select("full_name, role").eq("user_id", user?.id).maybeSingle();
+      const base: Ticket = { id: "", status: "open", priority: "normal", origin: "Téléphone", equipment: {}, photos: [], warranty: "hors_garantie", client_id: params.get("client") || null,
+        ...(mine?.role === "technician" ? { assigned_to: user?.id, technician: mine.full_name || "" } : {}) } as Ticket;
       const cid = params.get("contract");
       if (cid) {
         const { data: c } = await s.from("contracts").select("*").eq("id", cid).single();
@@ -116,7 +118,7 @@ function Editor() {
   async function schedule() {
     if (!t!.scheduled_at) return setErr("Choisissez la date du rendez-vous.");
     const saved = await save({ status: "planned" }); if (!saved) return;
-    await sb().from("interventions").insert({ title: `SAV ${saved.number}${saved.equipment?.type ? " — " + equipmentLabel(saved.equipment) : ""}`, client_id: saved.client_id, address: saved.address, starts_at: saved.scheduled_at, duration_min: 90, technician: saved.technician, notes: saved.problem });
+    await sb().from("interventions").insert({ assigned_to: (saved as any).assigned_to || null, title: `SAV ${saved.number}${saved.equipment?.type ? " — " + equipmentLabel(saved.equipment) : ""}`, client_id: saved.client_id, address: saved.address, starts_at: saved.scheduled_at, duration_min: 90, technician: saved.technician, notes: saved.problem });
     flash("🗓 Rendez-vous ajouté au planning");
   }
 
@@ -191,7 +193,10 @@ function Editor() {
             <h2 className="font-bold">Rendez-vous</h2>
             <div className="grid grid-cols-2 gap-2">
               <input type="datetime-local" className="input" disabled={closed} value={localInput(t.scheduled_at)} onChange={(e) => set({ scheduled_at: e.target.value ? new Date(e.target.value).toISOString() : null })} />
-              <input className="input" placeholder="Technicien" disabled={closed} value={t.technician || ""} onChange={(e) => set({ technician: e.target.value })} />
+              <select className="input" disabled={closed} value={(t as any).assigned_to || ""} onChange={(e) => { const m = team.find((x) => x.user_id === e.target.value); set({ assigned_to: e.target.value || null, technician: m ? memberName(m) : "" } as any); }}>
+                <option value="">— Technicien —</option>
+                {team.map((m) => <option key={m.user_id} value={m.user_id}>{memberName(m)}</option>)}
+              </select>
             </div>
             {t.status === "open" && <button className="btn-ghost w-full" onClick={schedule}>🗓 Planifier et ajouter au planning</button>}
           </section>
@@ -248,9 +253,9 @@ function Editor() {
             </div>
           )}
           {t.status === "resolved" && <button className="btn-primary w-full" disabled={!!busy} onClick={send}>📧 Envoyer le bon au client</button>}
-          {t.id && billable && !t.document_id && <button className="btn-ghost w-full" onClick={invoice}>💶 Facturer l'intervention</button>}
-          {t.document_id && <Link href={`/app/doc/${t.document_id}`} className="btn-ghost w-full">💶 Voir la facture</Link>}
-          {t.id && !billable && <Link href={`/app/doc/nouveau?kind=quote&client=${t.client_id || ""}`} className="btn-ghost w-full">📝 Faire un devis</Link>}
+          {isSup && t.id && billable && !t.document_id && <button className="btn-ghost w-full" onClick={invoice}>💶 Facturer l'intervention</button>}
+          {isSup && t.document_id && <Link href={`/app/doc/${t.document_id}`} className="btn-ghost w-full">💶 Voir la facture</Link>}
+          {isSup && t.id && !billable && <Link href={`/app/doc/nouveau?kind=quote&client=${t.client_id || ""}`} className="btn-ghost w-full">📝 Faire un devis</Link>}
           {t.status === "resolved" && <button className="btn-ghost w-full" onClick={() => save({ status: "closed" })}>🗂 Archiver (clôturé)</button>}
           {t.status === "closed" && <button className="btn-ghost w-full" onClick={() => save({ status: "resolved" })}>Rouvrir</button>}
           {t.id && t.status === "open" && <button className="btn-danger w-full" onClick={async () => { if (confirm("Supprimer cette demande ?")) { if (t.photos.length) await sb().storage.from("chantiers").remove(t.photos); await sb().from("sav_tickets").delete().eq("id", t.id); router.replace("/app/sav"); } }}>Supprimer</button>}

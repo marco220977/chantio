@@ -8,7 +8,9 @@ import Header from "@/components/Header";
 import type { Company } from "@/lib/types";
 
 function Settings() {
-  const { company, reload } = useCompany();
+  const { company, reload, isSup, me } = useCompany();
+  const [myName, setMyName] = useState("");
+  useEffect(() => { setMyName(me?.full_name || ""); }, [me]);
   const welcome = useSearchParams().get("bienvenue");
   const [c, setC] = useState<Partial<Company>>({});
   const [msg, setMsg] = useState("");
@@ -74,6 +76,32 @@ function Settings() {
   }
 
   if (!company) return null;
+  if (!isSup) return (
+    <>
+      <Header back title="Mon profil" />
+      <div className="space-y-4 p-4">
+        {msg && <p className="text-center text-sm">{msg}</p>}
+        <section className="card space-y-3">
+          <div><label className="label">Prénom et nom</label><input className="input" value={myName} onChange={(e) => setMyName(e.target.value)} /></div>
+          <button className="btn-primary w-full" onClick={async () => { await sb().rpc("update_my_name", { p_name: myName }); reload(); setMsg("✅ Enregistré"); }}>Enregistrer</button>
+        </section>
+        <section className="card space-y-3">
+          <h2 className="font-bold">Mot de passe</h2>
+          <input className="input" type="password" placeholder="Nouveau mot de passe" value={pwd} onChange={(e) => setPwd(e.target.value)} />
+          <button className="btn-ghost w-full" onClick={changePwd}>Modifier</button>
+        </section>
+        <section className="card space-y-3 border-red-200">
+          <h2 className="font-bold text-red-700">Supprimer mon accès</h2>
+          <p className="text-sm text-slate-600">Supprime votre identifiant. Le travail réalisé reste dans l'entreprise.</p>
+          <input className="input" placeholder="Tapez SUPPRIMER" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} />
+          <button className="btn w-full bg-red-600 text-white" disabled={confirmText.trim().toUpperCase() !== "SUPPRIMER"} onClick={async () => {
+            const { error } = await sb().rpc("delete_my_account"); if (error) return setMsg(error.message);
+            await sb().auth.signOut(); router.replace("/connexion");
+          }}>Supprimer mon accès</button>
+        </section>
+      </div>
+    </>
+  );
   return (
     <>
       <Header back title="Mon entreprise" />
@@ -81,6 +109,7 @@ function Settings() {
         {welcome && <p className="card bg-flame-light text-sm">Bienvenue ! Renseignez vos informations : elles apparaîtront sur vos devis et factures.</p>}
         <section className="card space-y-3">
           <h2 className="font-bold">Identité</h2>
+          {me && <div><label className="label">Votre nom (affiché à l'équipe)</label><div className="flex gap-2"><input className="input" value={myName} onChange={(e) => setMyName(e.target.value)} /><button className="btn-ghost" onClick={async () => { await sb().rpc("update_my_name", { p_name: myName }); reload(); }}>OK</button></div></div>}
           <div className="flex items-center gap-3">
             {c.logo_url ? <img src={c.logo_url} alt="logo" className="h-14 w-24 rounded border object-contain" /> : <div className="flex h-14 w-24 items-center justify-center rounded border text-xs text-slate-400">Logo</div>}
             <label className="btn-ghost cursor-pointer text-sm">Choisir un logo<input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} /></label>
@@ -128,7 +157,7 @@ function Settings() {
         <section id="suppression" className="card space-y-3 border-red-200">
           <h2 className="font-bold text-red-700">Supprimer mon compte</h2>
           <p className="text-sm text-slate-600">
-            Efface définitivement votre entreprise, vos clients, devis, factures, contrats, attestations, chantiers, photos et SAV. Cette action est irréversible.
+            Efface définitivement votre entreprise, les accès de votre équipe, vos clients, devis, factures, contrats, attestations, chantiers, photos et SAV. Cette action est irréversible.
           </p>
           <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-900">
             ⚠️ La loi vous oblige à conserver vos factures 10 ans. Avant de supprimer, téléchargez l'<Link href="/app/export" className="underline">export comptable</Link> et les PDF de vos factures.

@@ -5,12 +5,14 @@ import { sb } from "@/lib/supabase";
 import Header from "@/components/Header";
 import Modal from "@/components/Modal";
 import type { Client } from "@/lib/types";
+import { useCompany } from "@/components/CompanyContext";
 
 export default function Clients() {
   const [list, setList] = useState<Client[]>([]);
   const [q, setQ] = useState("");
   const [edit, setEdit] = useState<Partial<Client> | null>(null);
   const [err, setErr] = useState("");
+  const { isSup } = useCompany();
 
   const load = () => sb().from("clients").select("*").order("name").then(({ data }) => setList(data || []));
   useEffect(() => { load(); }, []);
@@ -44,7 +46,8 @@ export default function Clients() {
               <p className="truncate text-sm text-slate-500">{[c.city, c.phone].filter(Boolean).join(" · ")}</p>
             </button>
             {c.phone && <a href={`tel:${c.phone}`} className="text-xl">📞</a>}
-            <Link href={`/app/doc/nouveau?kind=quote&client=${c.id}`} className="chip bg-flame-light py-1.5 text-flame">Devis</Link>
+            {isSup ? <Link href={`/app/doc/nouveau?kind=quote&client=${c.id}`} className="chip bg-flame-light py-1.5 text-flame">Devis</Link>
+              : <Link href={`/app/sav/nouveau?client=${c.id}`} className="chip bg-flame-light py-1.5 text-flame">SAV</Link>}
           </div>
         ))}
         {list.length === 0 && <p className="py-10 text-center text-slate-500">Aucun client.</p>}

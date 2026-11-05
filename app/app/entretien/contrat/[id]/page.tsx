@@ -26,7 +26,7 @@ function Editor() {
   const { id } = useParams<{ id: string }>();
   const params = useSearchParams();
   const router = useRouter();
-  const { company } = useCompany();
+  const { company, isSup } = useCompany();
   const isNew = id === "nouveau";
   const [c, setC] = useState<Contract | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
@@ -42,7 +42,7 @@ function Editor() {
   }, [id, isNew, params]);
 
   if (!c || !company) return <><Header back title="…" /><p className="p-6 text-center text-slate-400">Chargement…</p></>;
-  const editable = c.status === "draft";
+  const editable = c.status === "draft" && isSup;
   const client = clients.find((x) => x.id === c.client_id);
   const set = (p: Partial<Contract>) => setC({ ...c, ...p });
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(""), 4000); };
@@ -167,7 +167,7 @@ function Editor() {
                 {VAT_RATES.map((r) => <option key={r} value={r}>{r}%</option>)}
               </select></div>
           </div>
-          <p className="text-right text-sm font-semibold">{eur(ttc)} TTC / an</p>
+          {isSup && <p className="text-right text-sm font-semibold">{eur(ttc)} TTC / an</p>}
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" disabled={!editable} checked={!!c.tacit_renewal} onChange={(e) => set({ tacit_renewal: e.target.checked })} /> Reconduction tacite chaque année</label>
           <div><label className="label">Prestations incluses (une par ligne)</label><textarea className="input text-sm" rows={6} disabled={!editable} value={c.includes || ""} onChange={(e) => set({ includes: e.target.value })} placeholder="Choisissez d'abord le type d'équipement" /></div>
           <div><label className="label">Non inclus</label><textarea className="input text-sm" rows={4} disabled={!editable} value={c.excludes || ""} onChange={(e) => set({ excludes: e.target.value })} /></div>
@@ -180,7 +180,7 @@ function Editor() {
             <h2 className="font-bold">Suivi</h2>
             <p className="text-sm">Échéance : <b>{dateFr(nextTerm(c))}</b></p>
             <div><label className="label">Prochaine visite</label>
-              <input type="date" className="input" value={c.next_visit_date || ""} onChange={(e) => set({ next_visit_date: e.target.value })} onBlur={() => save()} /></div>
+              <input type="date" className="input" disabled={!isSup} value={c.next_visit_date || ""} onChange={(e) => set({ next_visit_date: e.target.value })} onBlur={() => save()} /></div>
             {c.signature_data && (
               <div className="flex items-center gap-3 pt-2">
                 {c.signer_photo && <img src={c.signer_photo} alt="" className="h-16 w-16 rounded-xl object-cover" />}
@@ -202,8 +202,9 @@ function Editor() {
               <button className="btn-ghost" onClick={async () => shareOrSave(await pdf(), `${c.number}.pdf`)}>📤 Partager</button>
             </div>
           )}
-          {c.id && <button className="btn-ghost w-full" disabled={busy} onClick={send}>📧 Envoyer par e-mail</button>}
-          {c.status === "active" && (
+          {isSup && c.id && <button className="btn-ghost w-full" disabled={busy} onClick={send}>📧 Envoyer par e-mail</button>}
+          {c.status === "active" && !isSup && <Link href={`/app/entretien/visite/nouveau?contract=${c.id}`} className="btn-brand w-full py-3.5">🔧 Faire la visite d'entretien</Link>}
+          {c.status === "active" && isSup && (
             <>
               <Link href={`/app/entretien/visite/nouveau?contract=${c.id}`} className="btn-brand w-full py-3.5">🔧 Faire la visite d'entretien</Link>
               <div className="grid grid-cols-2 gap-2">

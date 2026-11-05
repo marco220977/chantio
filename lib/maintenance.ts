@@ -20,7 +20,7 @@ export type Report = {
   client_snapshot?: any; site_address?: string; equipment: Equipment; visit_date?: string;
   technician?: string; checklist: CheckItem[]; measures: Record<string, string>; observations?: string;
   advice?: string; improvements?: string; replacement?: string; next_visit_date?: string;
-  signed_at?: string; signer_name?: string; signature_data?: string; sent_at?: string; sent_to?: string;
+  signed_at?: string; signer_name?: string; signature_data?: string; sent_at?: string; sent_to?: string; assigned_to?: string | null;
 };
 
 type Def = {

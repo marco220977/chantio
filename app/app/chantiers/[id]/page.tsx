@@ -6,17 +6,35 @@ import jsPDF from "jspdf";
 import { sb } from "@/lib/supabase";
 import { addDays, dateFr } from "@/lib/calc";
 import { toDataUrl } from "@/lib/pdf";
-import { useCompany } from "@/components/CompanyContext";
+import { memberName, useCompany, type Member } from "@/components/CompanyContext";
 import Header from "@/components/Header";
 import Modal from "@/components/Modal";
 import { CH_STATUS, signedUrls, TAGS, uploadPhoto, type Chantier, type Entry } from "@/lib/chantiers";
 import type { Client } from "@/lib/types";
 
+function TeamPicker({ value, onChange, team }: { value: string[]; onChange: (v: string[]) => void; team: Member[] }) {
+  if (team.length < 2) return null;
+  return (
+    <div>
+      <label className="label">Équipe sur le chantier</label>
+      <div className="flex flex-wrap gap-1.5">
+        {team.map((m) => {
+          const on = value.includes(m.user_id);
+          return <button type="button" key={m.user_id} onClick={() => onChange(on ? value.filter((x) => x !== m.user_id) : [...value, m.user_id])}
+            className={`chip border py-1.5 ${on ? "border-ink bg-ink text-white" : "border-slate-200 bg-white"}`}>{on ? "✓ " : ""}{memberName(m)}</button>;
+        })}
+      </div>
+      <p className="mt-1 text-xs text-slate-500">Les techniciens choisis voient ce chantier dans leur journée.</p>
+    </div>
+  );
+}
+
 function NewChantier() {
+  const { team } = useCompany();
   const params = useSearchParams();
   const router = useRouter();
   const [clients, setClients] = useState<Client[]>([]);
-  const [c, setC] = useState<Partial<Chantier>>({ status: "planned", start_date: addDays(0) });
+  const [c, setC] = useState<Partial<Chantier> & { team?: string[] }>({ status: "planned", start_date: addDays(0), team: [] });
   const [err, setErr] = useState("");
 
   useEffect(() => {
@@ -53,6 +71,7 @@ function NewChantier() {
           <div><label className="label">Début</label><input type="date" className="input" value={c.start_date || ""} onChange={(e) => setC({ ...c, start_date: e.target.value })} /></div>
           <div><label className="label">Fin prévue</label><input type="date" className="input" value={c.end_date || ""} onChange={(e) => setC({ ...c, end_date: e.target.value })} /></div>
         </div>
+        <TeamPicker team={team} value={c.team || []} onChange={(v) => setC({ ...c, team: v })} />
         <div><label className="label">Notes</label><textarea className="input" rows={3} placeholder="Accès, code portail, matériel à prévoir…" value={c.notes || ""} onChange={(e) => setC({ ...c, notes: e.target.value })} /></div>
         <button className="btn-brand w-full py-3.5" onClick={create}>Créer le chantier</button>
       </div>
@@ -62,7 +81,7 @@ function NewChantier() {
 
 function Detail({ id }: { id: string }) {
   const router = useRouter();
-  const { company } = useCompany();
+  const { company, team, isSup } = useCompany();
   const [c, setC] = useState<Chantier | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
@@ -101,7 +120,8 @@ function Detail({ id }: { id: string }) {
         paths.push(await uploadPhoto(company!.id, c!.id, files[i]));
       }
       setBusy("Enregistrement…");
-      const { data: me } = await sb().from("members").select("full_name").limit(1).maybeSingle();
+      const { data: { user } } = await sb().auth.getUser();
+      const { data: me } = await sb().from("members").select("full_name").eq("user_id", user?.id).maybeSingle();
       const { error } = await sb().from("chantier_entries").insert({ chantier_id: c!.id, tag, text: text.trim() || null, photos: paths, author: me?.full_name || null });
       if (error) throw error;
       if (!c!.cover_path && paths[0]) await sb().from("chantiers").update({ cover_path: paths[0] }).eq("id", c!.id);
@@ -203,8 +223,9 @@ function Detail({ id }: { id: string }) {
           {c.address && <a className="block text-brand" target="_blank" rel="noreferrer" href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(c.address)}`}>🧭 {c.address}</a>}
           <p className="text-slate-500">{c.start_date ? `Du ${dateFr(c.start_date)}` : ""}{c.end_date ? ` au ${dateFr(c.end_date)}` : ""}</p>
           {c.notes && <p className="whitespace-pre-line text-slate-600">{c.notes}</p>}
+          {(c as any).team?.length > 0 && <p className="text-slate-500">👷 {team.filter((m) => (c as any).team.includes(m.user_id)).map(memberName).join(", ")}</p>}
           <div className="flex flex-wrap gap-3 pt-2">
-            {c.document_id && <Link href={`/app/doc/${c.document_id}`} className="text-brand">📝 Voir le devis</Link>}
+            {isSup && c.document_id && <Link href={`/app/doc/${c.document_id}`} className="text-brand">📝 Voir le devis</Link>}
             <button className="text-brand" onClick={() => setEdit(c)}>✏️ Modifier</button>
           </div>
         </section>
@@ -297,7 +318,7 @@ function Detail({ id }: { id: string }) {
           </div>
         )}
 
-        <button className="btn-danger w-full" onClick={removeChantier}>Supprimer le chantier</button>
+        {isSup && <button className="btn-danger w-full" onClick={removeChantier}>Supprimer le chantier</button>}
       </div>
 
       {viewer !== null && allPhotos[viewer] && (
@@ -328,6 +349,7 @@ function Detail({ id }: { id: string }) {
               <div><label className="label">Fin</label><input type="date" className="input" value={edit.end_date || ""} onChange={(e) => setEdit({ ...edit, end_date: e.target.value })} /></div>
             </div>
             <div><label className="label">Notes</label><textarea className="input" rows={3} value={edit.notes || ""} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} /></div>
+            {isSup && <TeamPicker team={team} value={(edit as any).team || []} onChange={(v) => setEdit({ ...edit, team: v } as any)} />}
             <button className="btn-primary w-full" onClick={saveEdit}>Enregistrer</button>
           </div>
         </Modal>
