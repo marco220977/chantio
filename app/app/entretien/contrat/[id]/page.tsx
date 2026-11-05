@@ -129,7 +129,7 @@ function Editor() {
     <>
       <Header back title={`Contrat ${c.number || "(nouveau)"}`} right={<span className={`chip ${st?.[1]}`}>{st?.[0]}</span>} />
       <div className="space-y-4 p-4">
-        {err && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
+        {err && <p onClick={() => setErr("")} className="fixed inset-x-4 top-4 z-50 rounded-xl bg-red-600 p-3 text-center text-sm font-semibold text-white shadow-lg">⚠️ {err}<span className="block text-xs font-normal opacity-80">Appuyez pour fermer</span></p>}
         {toast && <p className="fixed inset-x-4 top-4 z-50 rounded-xl bg-ink p-3 text-center text-sm font-semibold text-white shadow-lg">{toast}</p>}
         {renewalNoticeDue(c) && <button onClick={renewalNotice} className="card w-full border-blue-200 bg-blue-50 text-left text-sm">📨 Échéance le {dateFr(nextTerm(c))} : envoyez l'avis de reconduction au client (obligatoire, loi Chatel) →</button>}
 

@@ -131,7 +131,7 @@ function Visit() {
     <>
       <Header back title={`Attestation ${r.number || "(nouvelle)"}`} right={<span className={`chip ${r.status === "done" ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-700"}`}>{r.status === "done" ? "Validée" : "Brouillon"}</span>} />
       <div className="space-y-4 p-4">
-        {err && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
+        {err && <p onClick={() => setErr("")} className="fixed inset-x-4 top-4 z-50 rounded-xl bg-red-600 p-3 text-center text-sm font-semibold text-white shadow-lg">⚠️ {err}<span className="block text-xs font-normal opacity-80">Appuyez pour fermer</span></p>}
         {toast && <p className="fixed inset-x-4 top-4 z-50 rounded-xl bg-ink p-3 text-center text-sm font-semibold text-white shadow-lg">{toast}</p>}
 
         <section className="card space-y-3">
