@@ -14,7 +14,7 @@ export type Company = {
   city?: string; phone?: string; email?: string; iban?: string; bic?: string;
   insurance?: string; logo_url?: string; payment_terms_days?: number;
   late_penalty_rate?: string; quote_validity_days?: number; footer_note?: string;
-  plan?: string; trial_ends_at?: string;
+  plan?: string; trial_ends_at?: string; cancel_at?: string | null; stripe_subscription_id?: string | null;
 };
 
 export type Client = {

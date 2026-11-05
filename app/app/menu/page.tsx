@@ -6,7 +6,7 @@ import Header from "@/components/Header";
 
 const items = [
   ["/app/sav", "🛠", "SAV (après-vente)"], ["/app/quitus", "✅", "Quitus / PV de réception"], ["/app/planning", "🗓", "Planning"], ["/app/chiffre-affaires", "📈", "Chiffre d'affaires"], ["/app/clients", "👥", "Clients"], ["/app/entretien", "🔧", "Contrats et attestations d'entretien"], ["/app/catalogue", "📚", "Catalogue"], ["/app/scan", "📷", "Scanner une plaque"],
-  ["/app/parametres", "🏢", "Mon entreprise"], ["/app/abonnement", "⭐", "Abonnement"], ["/legal/cgv", "⚖️", "CGU, confidentialité, mentions légales"], ["/app/export", "📊", "Export comptable"],
+  ["/app/parametres", "🏢", "Mon entreprise"], ["/app/abonnement", "⭐", "Abonnement / se désabonner"], ["/legal/cgv", "⚖️", "CGU, confidentialité, mentions légales"], ["/app/export", "📊", "Export comptable"],
 ];
 
 export default function Menu() {

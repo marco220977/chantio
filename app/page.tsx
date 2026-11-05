@@ -11,7 +11,7 @@ const features = [
   ["📚", "Catalogue", "Vos prestations et fournitures avec prix d'achat pour suivre la marge."],
 ];
 
-export default function Home() {
+export default function Home({ searchParams }: { searchParams: { compte?: string } }) {
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-100 via-white to-orange-50">
       <div className="mx-auto max-w-3xl px-5 pb-16">
@@ -22,6 +22,7 @@ export default function Home() {
           <Link href="/connexion" className="btn-ghost !py-2 text-sm">Se connecter</Link>
         </nav>
 
+        {searchParams?.compte === "supprime" && <p className="card mt-2 bg-green-50 text-center text-sm text-green-800">Votre compte et toutes vos données ont été supprimés.</p>}
         <section className="pt-8 text-center">
           <span className="chip bg-flame-light text-flame">★ Fait pour la plomberie et le chauffage</span>
           <h1 className="mt-5 text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl">

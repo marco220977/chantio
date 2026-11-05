@@ -354,3 +354,6 @@ create policy chantiers_delete on storage.objects for delete to authenticated us
 
 -- ---------- V1.6 : catalogue de départ créé automatiquement à l'inscription ----------
 -- fonction seed_catalog(cid) appelée dans handle_new_user() (voir migration "starter_catalog_on_signup")
+
+-- ---------- V1.7 : désabonnement et suppression de compte ----------
+-- colonne companies.cancel_at, fonction delete_my_account() (voir migration "account_deletion_and_cancel")

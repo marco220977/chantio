@@ -1,6 +1,7 @@
 "use client";
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { sb } from "@/lib/supabase";
 import { useCompany } from "@/components/CompanyContext";
 import Header from "@/components/Header";
@@ -12,6 +13,34 @@ function Settings() {
   const [c, setC] = useState<Partial<Company>>({});
   const [msg, setMsg] = useState("");
   const [pwd, setPwd] = useState("");
+  const [confirmText, setConfirmText] = useState("");
+  const [deleting, setDeleting] = useState("");
+  const router = useRouter();
+
+  async function deleteAccount() {
+    if (confirmText.trim().toUpperCase() !== "SUPPRIMER") return;
+    if (!confirm("Dernière confirmation : toutes vos données seront définitivement effacées. Continuer ?")) return;
+    const s = sb();
+    try {
+      setDeleting("Suppression des photos…");
+      const paths: string[] = [];
+      const { data: entries } = await s.from("chantier_entries").select("photos");
+      (entries || []).forEach((e: any) => paths.push(...(e.photos || [])));
+      const { data: sav } = await s.from("sav_tickets").select("photos");
+      (sav || []).forEach((e: any) => paths.push(...(e.photos || [])));
+      for (let i = 0; i < paths.length; i += 100) await s.storage.from("chantiers").remove(paths.slice(i, i + 100));
+      const { data: logos } = await s.storage.from("logos").list(company!.id);
+      if (logos?.length) await s.storage.from("logos").remove(logos.map((f: any) => `${company!.id}/${f.name}`));
+      setDeleting("Suppression du compte…");
+      const { error } = await s.rpc("delete_my_account");
+      if (error) throw error;
+      await s.auth.signOut();
+      router.replace("/?compte=supprime");
+    } catch (e: any) {
+      setDeleting("");
+      setMsg(e.message || "Erreur lors de la suppression");
+    }
+  }
   useEffect(() => { if (company) setC(company); }, [company]);
 
   const F = ({ k, label, ph, type = "text", hint }: { k: keyof Company; label: string; ph?: string; type?: string; hint?: string }) => (
@@ -95,6 +124,20 @@ function Settings() {
           <h2 className="font-bold">Mot de passe</h2>
           <input className="input" type="password" placeholder="Nouveau mot de passe" value={pwd} onChange={(e) => setPwd(e.target.value)} />
           <button className="btn-ghost w-full" onClick={changePwd}>Modifier</button>
+        </section>
+        <section id="suppression" className="card space-y-3 border-red-200">
+          <h2 className="font-bold text-red-700">Supprimer mon compte</h2>
+          <p className="text-sm text-slate-600">
+            Efface définitivement votre entreprise, vos clients, devis, factures, contrats, attestations, chantiers, photos et SAV. Cette action est irréversible.
+          </p>
+          <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-900">
+            ⚠️ La loi vous oblige à conserver vos factures 10 ans. Avant de supprimer, téléchargez l'<Link href="/app/export" className="underline">export comptable</Link> et les PDF de vos factures.
+            {company.plan === "pro" && !company.cancel_at ? " Résiliez aussi d'abord votre abonnement (page Abonnement)." : ""}
+          </p>
+          <input className="input" placeholder="Tapez SUPPRIMER pour confirmer" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} />
+          <button className="btn w-full bg-red-600 text-white" disabled={confirmText.trim().toUpperCase() !== "SUPPRIMER" || !!deleting} onClick={deleteAccount}>
+            {deleting || "Supprimer définitivement mon compte"}
+          </button>
         </section>
       </div>
     </>

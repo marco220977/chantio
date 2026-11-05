@@ -17,6 +17,7 @@ export async function POST(req: Request) {
     const active = ["active", "trialing", "past_due"].includes(sub.status) && event.type !== "customer.subscription.deleted";
     await admin.from("companies").update({
       plan: active ? "pro" : "canceled", stripe_subscription_id: sub.id,
+      cancel_at: sub.cancel_at && active ? new Date(sub.cancel_at * 1000).toISOString() : null,
     }).eq("stripe_customer_id", sub.customer as string);
   }
   return NextResponse.json({ received: true });
