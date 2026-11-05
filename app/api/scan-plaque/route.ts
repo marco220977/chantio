@@ -1,3 +1,4 @@
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/config";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -10,7 +11,7 @@ Si l'image n'est pas une plaque signalétique, renvoie confidence "low" et expli
 
 export async function POST(req: Request) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
-  const s = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+  const s = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   const { data: { user } } = await s.auth.getUser(token);
   if (!user) return NextResponse.json({ error: "Non connecté" }, { status: 401 });
   if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ error: "Clé ANTHROPIC_API_KEY manquante" }, { status: 500 });

@@ -1,4 +1,5 @@
 "use client";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/config";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
@@ -7,7 +8,7 @@ import { downloadPdf } from "@/lib/pdf";
 import SignaturePad from "@/components/SignaturePad";
 import type { Company, Doc } from "@/lib/types";
 
-const anon = () => createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false } });
+const anon = () => createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
 
 export default function Signer() {
   const { token } = useParams<{ token: string }>();
