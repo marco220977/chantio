@@ -1,0 +1,65 @@
+"use client";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { sb } from "@/lib/supabase";
+
+function Form() {
+  const params = useSearchParams();
+  const router = useRouter();
+  const [signup, setSignup] = useState(params.get("mode") === "signup");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [company, setCompany] = useState("");
+  const [name, setName] = useState("");
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault(); setBusy(true); setMsg("");
+    const s = sb();
+    if (signup) {
+      const { data, error } = await s.auth.signUp({
+        email, password,
+        options: { data: { company_name: company, full_name: name }, emailRedirectTo: `${location.origin}/app` },
+      });
+      if (error) setMsg(error.message);
+      else if (!data.session) setMsg("Compte créé ! Confirmez votre adresse via l'e-mail reçu, puis connectez-vous.");
+      else router.replace("/app/parametres?bienvenue=1");
+    } else {
+      const { error } = await s.auth.signInWithPassword({ email, password });
+      if (error) setMsg("E-mail ou mot de passe incorrect.");
+      else router.replace("/app");
+    }
+    setBusy(false);
+  }
+
+  async function reset() {
+    if (!email) return setMsg("Saisissez votre e-mail d'abord.");
+    await sb().auth.resetPasswordForEmail(email, { redirectTo: `${location.origin}/app/parametres` });
+    setMsg("E-mail de réinitialisation envoyé.");
+  }
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-100 to-orange-50 p-5">
+      <form onSubmit={submit} className="card w-full max-w-sm space-y-4 p-6">
+        <h1 className="text-2xl font-extrabold">{signup ? "Créer mon compte" : "Connexion"}</h1>
+        {signup && (
+          <>
+            <div><label className="label">Nom de l'entreprise</label><input className="input" required value={company} onChange={(e) => setCompany(e.target.value)} /></div>
+            <div><label className="label">Votre nom</label><input className="input" value={name} onChange={(e) => setName(e.target.value)} /></div>
+          </>
+        )}
+        <div><label className="label">E-mail</label><input className="input" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+        <div><label className="label">Mot de passe</label><input className="input" type="password" minLength={6} required value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+        {msg && <p className="rounded-lg bg-blue-50 p-3 text-sm text-blue-900">{msg}</p>}
+        <button className="btn-primary w-full" disabled={busy}>{busy ? "…" : signup ? "Créer mon compte" : "Se connecter"}</button>
+        <button type="button" className="w-full text-sm text-brand" onClick={() => setSignup(!signup)}>
+          {signup ? "J'ai déjà un compte" : "Pas encore de compte ? Essai gratuit"}
+        </button>
+        {!signup && <button type="button" className="w-full text-xs text-slate-500" onClick={reset}>Mot de passe oublié</button>}
+      </form>
+    </main>
+  );
+}
+
+export default function Page() { return <Suspense><Form /></Suspense>; }

@@ -1,0 +1,103 @@
+"use client";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { sb } from "@/lib/supabase";
+import { useCompany } from "@/components/CompanyContext";
+import Header from "@/components/Header";
+import type { Company } from "@/lib/types";
+
+function Settings() {
+  const { company, reload } = useCompany();
+  const welcome = useSearchParams().get("bienvenue");
+  const [c, setC] = useState<Partial<Company>>({});
+  const [msg, setMsg] = useState("");
+  const [pwd, setPwd] = useState("");
+  useEffect(() => { if (company) setC(company); }, [company]);
+
+  const F = ({ k, label, ph, type = "text", hint }: { k: keyof Company; label: string; ph?: string; type?: string; hint?: string }) => (
+    <div>
+      <label className="label">{label}</label>
+      <input className="input" type={type} placeholder={ph} value={(c as any)[k] ?? ""} onChange={(e) => setC({ ...c, [k]: type === "number" ? Number(e.target.value) : e.target.value })} />
+      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
+    </div>
+  );
+
+  async function save() {
+    const { id, plan, trial_ends_at, ...rest } = c as any;
+    delete rest.stripe_customer_id; delete rest.stripe_subscription_id; delete rest.created_at;
+    const { error } = await sb().from("companies").update(rest).eq("id", company!.id);
+    setMsg(error ? error.message : "✅ Enregistré"); reload();
+    setTimeout(() => setMsg(""), 2500);
+  }
+
+  async function upload(file: File) {
+    const path = `${company!.id}/logo-${Date.now()}.${file.name.split(".").pop()}`;
+    const { error } = await sb().storage.from("logos").upload(path, file, { upsert: true });
+    if (error) return setMsg(error.message);
+    const { data } = sb().storage.from("logos").getPublicUrl(path);
+    setC({ ...c, logo_url: data.publicUrl });
+  }
+
+  async function changePwd() {
+    if (pwd.length < 6) return setMsg("6 caractères minimum");
+    const { error } = await sb().auth.updateUser({ password: pwd });
+    setMsg(error ? error.message : "✅ Mot de passe modifié"); setPwd("");
+  }
+
+  if (!company) return null;
+  return (
+    <>
+      <Header back title="Mon entreprise" />
+      <div className="space-y-4 p-4">
+        {welcome && <p className="card bg-flame-light text-sm">Bienvenue ! Renseignez vos informations : elles apparaîtront sur vos devis et factures.</p>}
+        <section className="card space-y-3">
+          <h2 className="font-bold">Identité</h2>
+          <div className="flex items-center gap-3">
+            {c.logo_url ? <img src={c.logo_url} alt="logo" className="h-14 w-24 rounded border object-contain" /> : <div className="flex h-14 w-24 items-center justify-center rounded border text-xs text-slate-400">Logo</div>}
+            <label className="btn-ghost cursor-pointer text-sm">Choisir un logo<input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} /></label>
+          </div>
+          {F({ k: "name", label: "Nom commercial / raison sociale" })}
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="label">Forme juridique</label>
+              <select className="input" value={c.legal_form || "EI"} onChange={(e) => setC({ ...c, legal_form: e.target.value })}>
+                {["EI", "Micro-entreprise", "EURL", "SARL", "SASU", "SAS"].map((x) => <option key={x}>{x}</option>)}
+              </select></div>
+            {F({ k: "capital", label: "Capital", ph: "ex. 1 000 €" })}
+          </div>
+          {F({ k: "siret", label: "SIRET", ph: "14 chiffres" })}
+          {F({ k: "rcs", label: "RCS / RM", ph: "ex. RM 123 456 789 Créteil" })}
+          {F({ k: "vat_number", label: "N° TVA intracommunautaire", ph: "FR..." })}
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={!!c.vat_exempt} onChange={(e) => setC({ ...c, vat_exempt: e.target.checked })} />
+            Franchise en base de TVA (micro-entreprise : « TVA non applicable, art. 293 B du CGI »)
+          </label>
+        </section>
+        <section className="card space-y-3">
+          <h2 className="font-bold">Coordonnées</h2>
+          {F({ k: "address", label: "Adresse" })}
+          <div className="grid grid-cols-3 gap-2">{F({ k: "zip", label: "CP" })}<div className="col-span-2">{F({ k: "city", label: "Ville" })}</div></div>
+          {F({ k: "phone", label: "Téléphone", type: "tel" })}{F({ k: "email", label: "E-mail", type: "email" })}
+        </section>
+        <section className="card space-y-3">
+          <h2 className="font-bold">Assurance et paiement</h2>
+          {F({ k: "insurance", label: "Assurance décennale (obligatoire)", ph: "Assureur, n° de contrat, couverture géographique" })}
+          {F({ k: "iban", label: "IBAN" })}{F({ k: "bic", label: "BIC" })}
+          <div className="grid grid-cols-2 gap-3">
+            {F({ k: "payment_terms_days", label: "Délai paiement (jours)", type: "number" })}
+            {F({ k: "quote_validity_days", label: "Validité devis (jours)", type: "number" })}
+          </div>
+          {F({ k: "late_penalty_rate", label: "Taux des pénalités de retard" })}
+          {F({ k: "footer_note", label: "Mention pied de page (optionnel)" })}
+        </section>
+        <button className="btn-primary sticky bottom-24 w-full py-3.5 shadow-lg" onClick={save}>Enregistrer</button>
+        {msg && <p className="text-center text-sm">{msg}</p>}
+        <section className="card space-y-3">
+          <h2 className="font-bold">Mot de passe</h2>
+          <input className="input" type="password" placeholder="Nouveau mot de passe" value={pwd} onChange={(e) => setPwd(e.target.value)} />
+          <button className="btn-ghost w-full" onClick={changePwd}>Modifier</button>
+        </section>
+      </div>
+    </>
+  );
+}
+export default function Page() { return <Suspense><Settings /></Suspense>; }
