@@ -279,3 +279,15 @@ create policy logos_upload on storage.objects for insert to authenticated
 drop policy if exists logos_update on storage.objects;
 create policy logos_update on storage.objects for update to authenticated
   using (bucket_id = 'logos' and (storage.foldername(name))[1] = my_company_id()::text);
+
+-- ---------- V1.1 : photo du signataire ----------
+alter table documents add column if not exists signer_photo text;
+create or replace function sign_public_quote(p_token uuid, p_name text, p_signature text, p_photo text, p_ip text default null)
+returns boolean language plpgsql security definer set search_path = public as $$
+begin
+  update documents set status = 'signed', signed_at = now(), signer_name = p_name,
+    signature_data = p_signature, signer_photo = p_photo, signer_ip = p_ip
+  where public_token = p_token and kind = 'quote' and status in ('draft','sent');
+  return found;
+end $$;
+grant execute on function sign_public_quote(uuid, text, text, text, text) to anon, authenticated;

@@ -60,7 +60,7 @@ export default function Signer() {
       ) : canSign && (
         signing ? (
           <div className="card"><SignaturePad defaultName={doc.client_snapshot?.name || ""} onCancel={() => setSigning(false)}
-            onDone={async (name, sig) => { await anon().rpc("sign_public_quote", { p_token: token, p_name: name, p_signature: sig }); setSigning(false); load(); }} /></div>
+            onDone={async (name, sig, photo) => { await anon().rpc("sign_public_quote", { p_token: token, p_name: name, p_signature: sig, p_photo: photo }); setSigning(false); load(); }} /></div>
         ) : (
           <button className="btn-brand w-full py-4 text-lg" onClick={() => setSigning(true)}>✍️ Accepter et signer</button>
         )

@@ -77,7 +77,7 @@ function Editor() {
       valid_until: cur.valid_until || null, lines: cur.lines, discount_pct: cur.discount_pct || 0,
       deposit_pct: cur.deposit_pct || 0, total_ht: totals.ht, total_vat: totals.vat, total_ttc: totals.ttc,
       notes: cur.notes, source_quote_id: cur.source_quote_id || null,
-      signed_at: cur.signed_at || null, signer_name: cur.signer_name || null, signature_data: cur.signature_data || null,
+      signed_at: cur.signed_at || null, signer_name: cur.signer_name || null, signature_data: cur.signature_data || null, signer_photo: cur.signer_photo || null,
       paid_at: cur.paid_at || null, payment_method: cur.payment_method || null, number: cur.number || null,
     };
     const locked = cur.id && cur.kind !== "quote" && doc!.status !== "draft";
@@ -280,7 +280,10 @@ function Editor() {
         {doc.signature_data && (
           <section className="card">
             <p className="label">Signé par {doc.signer_name} le {new Date(doc.signed_at!).toLocaleString("fr-FR")}</p>
-            <img src={doc.signature_data} alt="Signature" className="h-24" />
+            <div className="flex items-center gap-4">
+              {doc.signer_photo && <img src={doc.signer_photo} alt="Signataire" className="h-24 w-24 rounded-xl object-cover" />}
+              <img src={doc.signature_data} alt="Signature" className="h-24" />
+            </div>
           </section>
         )}
         {doc.status === "paid" && <p className="card text-sm text-green-800">✅ Payée le {dateFr(doc.paid_at)} ({doc.payment_method})</p>}
@@ -369,7 +372,7 @@ function Editor() {
       {modal === "sign" && (
         <Modal title={`Signature — ${eur(totals.ttc)} TTC`} onClose={() => setModal("")}>
           <SignaturePad defaultName={client?.name || ""} onCancel={() => setModal("")}
-            onDone={async (name, sig) => { setModal(""); await save({ status: "signed", signer_name: name, signature_data: sig, signed_at: new Date().toISOString() }); }} />
+            onDone={async (name, sig, photo) => { setModal(""); await save({ status: "signed", signer_name: name, signature_data: sig, signer_photo: photo, signed_at: new Date().toISOString() }); }} />
         </Modal>
       )}
 

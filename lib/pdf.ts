@@ -129,6 +129,12 @@ export async function buildPdf(doc: Doc, company: Company): Promise<jsPDF> {
     y += 3;
     pdf.setFont("helvetica", "bold").setFontSize(9).text("Bon pour accord — signature du client", 120, y);
     pdf.setDrawColor(200).rect(120, y + 2, 75, 32);
+    if (doc.signer_photo) {
+      try {
+        pdf.addImage(doc.signer_photo, "JPEG", 85, y + 2, 32, 32);
+        pdf.setFont("helvetica", "normal").setFontSize(7).text("Photo du signataire", 85, y + 37);
+      } catch {}
+    }
     if (doc.signature_data) {
       try { pdf.addImage(doc.signature_data, "PNG", 122, y + 4, 70, 22); } catch {}
       pdf.setFont("helvetica", "normal").setFontSize(7.5)
