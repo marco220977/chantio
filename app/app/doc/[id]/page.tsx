@@ -29,6 +29,7 @@ function Editor() {
   const [catQ, setCatQ] = useState("");
   const [newClient, setNewClient] = useState<Partial<Client>>({ type: "particulier" });
   const [toast, setToast] = useState("");
+  const [showMargin, setShowMargin] = useState(false);
 
   useEffect(() => {
     const s = sb();
@@ -327,7 +328,12 @@ function Editor() {
             <div key={r} className="flex justify-between text-sm text-slate-500"><span>TVA {r.replace(".", ",")} %</span><span>{eur(v.vat)}</span></div>
           ))}
           <div className="flex justify-between border-t pt-2 text-lg font-extrabold"><span>Total TTC</span><span>{eur(totals.ttc)}</span></div>
-          {margin && <p className="text-right text-xs text-slate-500">Marge estimée : {eur(margin.value)} ({margin.pct.toFixed(0)} %) — visible par vous seul</p>}
+          {margin && (
+            <button type="button" className="ml-auto block text-right text-xs text-slate-400"
+              onClick={() => { setShowMargin(true); setTimeout(() => setShowMargin(false), 5000); }}>
+              {showMargin ? `Marge : ${eur(margin.value)} (${margin.pct.toFixed(0)} %)` : "•••"}
+            </button>
+          )}
           <div><label className="label mt-2">Notes / conditions</label><textarea className="input text-sm" rows={2} disabled={!editable} value={doc.notes || ""} onChange={(e) => set({ notes: e.target.value })} /></div>
         </section>
 
