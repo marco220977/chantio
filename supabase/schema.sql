@@ -351,3 +351,6 @@ create policy chantiers_delete on storage.objects for delete to authenticated us
 
 -- ---------- V1.5 : quitus (PV de réception) et SAV ----------
 -- (voir migration "quitus_sav" : tables receptions et sav_tickets, RLS tenant_rw)
+
+-- ---------- V1.6 : catalogue de départ créé automatiquement à l'inscription ----------
+-- fonction seed_catalog(cid) appelée dans handle_new_user() (voir migration "starter_catalog_on_signup")
