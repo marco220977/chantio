@@ -3,6 +3,10 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { sb } from "@/lib/supabase";
 
+const frError = (m: string) => /rate limit/i.test(m) ? "Trop d'inscriptions en peu de temps. Réessayez dans une heure (ou demandez au responsable de l'appli d'augmenter la limite)."
+  : /registered|already/i.test(m) ? "Un compte existe déjà avec cet e-mail."
+  : /password/i.test(m) ? "Mot de passe trop court (6 caractères minimum)." : m;
+
 export default function Rejoindre() {
   const { token } = useParams<{ token: string }>();
   const router = useRouter();
@@ -22,7 +26,7 @@ export default function Rejoindre() {
     await s.auth.signOut();
     const { data, error } = await s.auth.signUp({ email: inv.email, password: pwd, options: { data: { invite_token: token, full_name: name } } });
     setBusy(false);
-    if (error) return setMsg(error.message.includes("registered") ? "Un compte existe déjà avec cet e-mail. Demandez une invitation sur une autre adresse." : error.message);
+    if (error) return setMsg(frError(error.message));
     if (!data.session) return setMsg("Compte créé ! Confirmez votre adresse via l'e-mail reçu, puis connectez-vous.");
     router.replace("/app");
   }

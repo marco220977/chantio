@@ -3,6 +3,10 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { sb } from "@/lib/supabase";
 
+const frError = (m: string) => /rate limit/i.test(m) ? "Trop d'inscriptions en peu de temps. Réessayez dans une heure (ou demandez au responsable de l'appli d'augmenter la limite)."
+  : /registered|already/i.test(m) ? "Un compte existe déjà avec cet e-mail."
+  : /password/i.test(m) ? "Mot de passe trop court (6 caractères minimum)." : m;
+
 function Form() {
   const params = useSearchParams();
   const router = useRouter();
@@ -23,7 +27,7 @@ function Form() {
         email, password,
         options: { data: { company_name: company, full_name: name }, emailRedirectTo: `${location.origin}/app` },
       });
-      if (error) setMsg(error.message);
+      if (error) setMsg(frError(error.message));
       else if (!data.session) setMsg("Compte créé ! Confirmez votre adresse via l'e-mail reçu, puis connectez-vous.");
       else router.replace("/app/parametres?bienvenue=1");
     } else {
