@@ -8,7 +8,7 @@ export default {
         brand: { DEFAULT: "#1d4ed8", dark: "#1e3a8a" },
         flame: { DEFAULT: "#ea7a0c", light: "#fff4e6" },
       },
-      fontFamily: { sans: ["Inter", "system-ui", "sans-serif"] },
+      fontFamily: { sans: ["system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"] },
     },
   },
   plugins: [],

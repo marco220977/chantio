@@ -38,6 +38,7 @@ export default function Abonnement() {
             <ul className="space-y-1 text-left text-sm">
               {["Devis et factures illimités", "Signature électronique sur place et à distance", "Scan de plaque chaudière", "Planning et catalogue", "Export comptable"].map((x) => <li key={x}>✅ {x}</li>)}
             </ul>
+            <p className="text-xs text-slate-500">Sans engagement, résiliable à tout moment. <a href="/legal/cgv" className="text-brand underline">Conditions générales</a></p>
             <button className="btn-brand w-full py-3.5" disabled={busy} onClick={() => go("/api/stripe/checkout")}>{busy ? "Redirection…" : "S'abonner"}</button>
           </div>
         ) : (

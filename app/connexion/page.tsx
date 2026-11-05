@@ -13,6 +13,7 @@ function Form() {
   const [name, setName] = useState("");
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const [accept, setAccept] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setBusy(true); setMsg("");
@@ -51,8 +52,14 @@ function Form() {
         )}
         <div><label className="label">E-mail</label><input className="input" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></div>
         <div><label className="label">Mot de passe</label><input className="input" type="password" minLength={6} required value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+        {signup && (
+          <label className="flex items-start gap-2 text-xs text-slate-600">
+            <input type="checkbox" className="mt-0.5" checked={accept} onChange={(e) => setAccept(e.target.checked)} />
+            <span>J'accepte les <a href="/legal/cgv" target="_blank" className="text-brand underline">conditions générales</a>, l'<a href="/legal/sous-traitance" target="_blank" className="text-brand underline">accord de sous-traitance</a> et la <a href="/legal/confidentialite" target="_blank" className="text-brand underline">politique de confidentialité</a>.</span>
+          </label>
+        )}
         {msg && <p className="rounded-lg bg-blue-50 p-3 text-sm text-blue-900">{msg}</p>}
-        <button className="btn-primary w-full" disabled={busy}>{busy ? "…" : signup ? "Créer mon compte" : "Se connecter"}</button>
+        <button className="btn-primary w-full" disabled={busy || (signup && !accept)}>{busy ? "…" : signup ? "Créer mon compte" : "Se connecter"}</button>
         <button type="button" className="w-full text-sm text-brand" onClick={() => setSignup(!signup)}>
           {signup ? "J'ai déjà un compte" : "Pas encore de compte ? Essai gratuit"}
         </button>

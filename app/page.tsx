@@ -55,7 +55,15 @@ export default function Home() {
           <Link href="/connexion?mode=signup" className="btn-brand mt-6 w-full py-3.5">Commencer gratuitement</Link>
         </section>
 
-        <footer className="mt-16 text-center text-xs text-slate-400">© {new Date().getFullYear()} {APP}</footer>
+        <footer className="mt-16 space-y-2 text-center text-xs text-slate-400">
+          <p className="flex flex-wrap justify-center gap-4">
+            <Link href="/legal/mentions-legales">Mentions légales</Link>
+            <Link href="/legal/cgv">CGU / CGV</Link>
+            <Link href="/legal/confidentialite">Confidentialité</Link>
+            <Link href="/legal/sous-traitance">Sous-traitance RGPD</Link>
+          </p>
+          <p>© {new Date().getFullYear()} {APP}</p>
+        </footer>
       </div>
     </main>
   );
