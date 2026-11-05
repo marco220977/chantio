@@ -4,10 +4,10 @@ import autoTable from "jspdf-autotable";
 import type { Company, Doc } from "./types";
 import { computeTotals, dateFr } from "./calc";
 
-const money = (n: number) =>
+export const money = (n: number) =>
   (Number(n) || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/ | /g, " ") + " €";
 
-async function toDataUrl(url: string): Promise<string | null> {
+export async function toDataUrl(url: string): Promise<string | null> {
   try {
     const r = await fetch(url);
     const b = await r.blob();

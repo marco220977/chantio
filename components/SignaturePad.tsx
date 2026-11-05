@@ -9,8 +9,11 @@ async function compress(file: File): Promise<string> {
   return c.toDataURL("image/jpeg", 0.7);
 }
 
-export default function SignaturePad({ onDone, onCancel, defaultName = "" }: {
+const QUOTE_AGREEMENT = "« Bon pour accord » — j'accepte ce devis et ses conditions, et je certifie l'exactitude des informations relatives au logement (TVA à taux réduit le cas échéant).";
+
+export default function SignaturePad({ onDone, onCancel, defaultName = "", agreement = QUOTE_AGREEMENT, allowPhoto = true }: {
   onDone: (name: string, dataUrl: string, photo: string | null) => void; onCancel?: () => void; defaultName?: string;
+  agreement?: string; allowPhoto?: boolean;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
@@ -40,7 +43,7 @@ export default function SignaturePad({ onDone, onCancel, defaultName = "" }: {
     <div className="space-y-3">
       <div><label className="label">Nom du signataire</label><input className="input" value={name} onChange={(e) => setName(e.target.value)} /></div>
 
-      <div>
+      {allowPhoto && <div>
         <span className="label">Photo du signataire (preuve, facultative)</span>
         {photo ? (
           <div className="flex items-center gap-3">
@@ -55,7 +58,7 @@ export default function SignaturePad({ onDone, onCancel, defaultName = "" }: {
           </label>
         )}
         <p className="mt-1 text-xs text-slate-500">La photo est conservée avec le devis uniquement comme preuve de la signature. Le signataire doit être d'accord.</p>
-      </div>
+      </div>}
 
       <div>
         <div className="flex items-center justify-between"><span className="label">Signature</span><button type="button" onClick={clear} className="text-xs text-brand">Effacer</button></div>
@@ -63,7 +66,7 @@ export default function SignaturePad({ onDone, onCancel, defaultName = "" }: {
       </div>
       <label className="flex items-start gap-2 text-sm">
         <input type="checkbox" className="mt-1" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
-        <span>« Bon pour accord » — j'accepte ce devis et ses conditions, et je certifie l'exactitude des informations relatives au logement (TVA à taux réduit le cas échéant).{photo ? " J'accepte que ma photo soit conservée comme preuve de signature." : ""}</span>
+        <span>{agreement}{photo ? " J'accepte que ma photo soit conservée comme preuve de signature." : ""}</span>
       </label>
       <div className="flex gap-2">
         {onCancel && <button type="button" className="btn-ghost flex-1" onClick={onCancel}>Annuler</button>}

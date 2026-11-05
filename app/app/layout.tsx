@@ -7,6 +7,7 @@ const tabs = [
   { href: "/app", label: "Accueil", icon: "⌂" },
   { href: "/app/devis", label: "Devis", icon: "📝" },
   { href: "/app/factures", label: "Factures", icon: "💶" },
+  { href: "/app/entretien", label: "Entretien", icon: "🔧" },
   { href: "/app/planning", label: "Planning", icon: "🗓" },
   { href: "/app/menu", label: "Menu", icon: "☰" },
 ];
@@ -31,11 +32,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {children}
       </div>
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-auto grid max-w-2xl grid-cols-5">
+        <div className="mx-auto grid max-w-2xl grid-cols-6">
           {tabs.map((t) => {
             const active = t.href === "/app" ? path === "/app" : path.startsWith(t.href);
             return (
-              <Link key={t.href} href={t.href} className={`flex flex-col items-center py-2 text-[11px] font-medium ${active ? "text-flame" : "text-slate-500"}`}>
+              <Link key={t.href} href={t.href} className={`flex flex-col items-center py-2 text-[10px] font-medium ${active ? "text-flame" : "text-slate-500"}`}>
                 <span className="text-xl leading-6">{t.icon}</span>{t.label}
               </Link>
             );

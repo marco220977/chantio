@@ -5,7 +5,7 @@ import { sb } from "@/lib/supabase";
 import Header from "@/components/Header";
 
 const items = [
-  ["/app/clients", "👥", "Clients"], ["/app/catalogue", "📚", "Catalogue"], ["/app/scan", "📷", "Scanner une plaque"],
+  ["/app/clients", "👥", "Clients"], ["/app/entretien", "🔧", "Contrats et attestations d'entretien"], ["/app/catalogue", "📚", "Catalogue"], ["/app/scan", "📷", "Scanner une plaque"],
   ["/app/parametres", "🏢", "Mon entreprise"], ["/app/abonnement", "⭐", "Abonnement"], ["/app/export", "📊", "Export comptable"],
 ];
 

@@ -295,3 +295,32 @@ grant execute on function sign_public_quote(uuid, text, text, text, text) to ano
 -- ---------- V1.2 : suivi des envois ----------
 alter table documents add column if not exists sent_at timestamptz;
 alter table documents add column if not exists sent_to text;
+
+-- ---------- V1.3 : module entretien (contrats + attestations) ----------
+create table if not exists contracts (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null default my_company_id() references companies(id) on delete cascade,
+  created_at timestamptz default now(), number text, status text not null default 'draft',
+  client_id uuid references clients(id) on delete set null, client_snapshot jsonb, site_address text,
+  equipment jsonb not null default '{}', start_date date default current_date, duration_months int default 12,
+  period_months int default 12, tacit_renewal boolean default true, price_ht numeric(12,2) default 0,
+  vat_rate numeric(5,2) default 10, includes text, excludes text, options text, notes text, next_visit_date date,
+  signed_at timestamptz, signer_name text, signature_data text, signer_photo text, signed_on_site boolean default true,
+  sent_at timestamptz, sent_to text, renewal_notice_at timestamptz
+);
+create unique index if not exists contracts_number_uniq on contracts(company_id, number) where number is not null;
+create table if not exists maintenance_reports (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null default my_company_id() references companies(id) on delete cascade,
+  created_at timestamptz default now(), number text, status text not null default 'draft',
+  contract_id uuid references contracts(id) on delete set null, client_id uuid references clients(id) on delete set null,
+  client_snapshot jsonb, site_address text, equipment jsonb not null default '{}', visit_date date default current_date,
+  technician text, checklist jsonb not null default '[]', measures jsonb not null default '{}', observations text,
+  advice text, improvements text, replacement text, next_visit_date date, signed_at timestamptz, signer_name text,
+  signature_data text, sent_at timestamptz, sent_to text
+);
+create unique index if not exists reports_number_uniq on maintenance_reports(company_id, number) where number is not null;
+alter table contracts enable row level security;
+alter table maintenance_reports enable row level security;
+create policy tenant_rw on contracts for all using (company_id = my_company_id()) with check (company_id = my_company_id());
+create policy tenant_rw on maintenance_reports for all using (company_id = my_company_id()) with check (company_id = my_company_id());

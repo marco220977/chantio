@@ -10,6 +10,7 @@ export default function Dashboard() {
   const { company } = useCompany();
   const [docs, setDocs] = useState<Doc[]>([]);
   const [next, setNext] = useState<any[]>([]);
+  const [dueVisits, setDueVisits] = useState<any[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -19,6 +20,9 @@ export default function Dashboard() {
       const { data: iv } = await s.from("interventions").select("*, clients(name)")
         .gte("starts_at", new Date().toISOString()).eq("status", "planned").order("starts_at").limit(3);
       setNext(iv || []);
+      const in30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+      const { data: ct } = await s.from("contracts").select("id, client_snapshot, next_visit_date, equipment").eq("status", "active").lte("next_visit_date", in30).order("next_visit_date");
+      setDueVisits(ct || []);
     })();
   }, []);
 
@@ -46,7 +50,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-2 gap-3">
         <Link href="/app/doc/nouveau?kind=quote" className="btn-brand py-4">＋ Nouveau devis</Link>
-        <Link href="/app/scan" className="btn-primary py-4">📷 Scanner plaque</Link>
+        <Link href="/app/entretien/visite/nouveau" className="btn-primary py-4">🔧 Visite d'entretien</Link>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -59,6 +63,13 @@ export default function Dashboard() {
       {company && !company.siret && (
         <Link href="/app/parametres" className="card block border-amber-300 bg-amber-50 text-sm">
           ⚠️ Complétez vos informations légales (SIRET, adresse, assurance décennale) pour des documents conformes →
+        </Link>
+      )}
+
+      {dueVisits.length > 0 && (
+        <Link href="/app/entretien" className="card block border-amber-300 bg-amber-50">
+          <p className="font-bold">🔧 {dueVisits.length} entretien{dueVisits.length > 1 ? "s" : ""} sous contrat à planifier</p>
+          <p className="text-sm text-slate-600">{dueVisits.slice(0, 3).map((c) => c.client_snapshot?.name).join(", ")}{dueVisits.length > 3 ? "…" : ""}</p>
         </Link>
       )}
 
