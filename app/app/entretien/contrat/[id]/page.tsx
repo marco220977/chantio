@@ -210,6 +210,7 @@ function Editor() {
                 <button className="btn-ghost" onClick={invoice}>💶 Facturer l'année</button>
                 <Link className="btn-ghost" href={`/app/planning?client=${c.client_id}`}>🗓 Planifier</Link>
               </div>
+              <Link className="btn-ghost w-full" href={`/app/sav/nouveau?contract=${c.id}`}>🛠 Ouvrir un SAV</Link>
               {c.tacit_renewal && <button className="btn-ghost w-full" disabled={busy} onClick={renewalNotice}>📨 Avis d'échéance</button>}
               <button className="btn-danger w-full" onClick={cancel}>Résilier le contrat</button>
             </>

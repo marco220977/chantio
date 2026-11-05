@@ -213,6 +213,7 @@ function Detail({ id }: { id: string }) {
           {c.status === "planned" && <button className="btn-primary" onClick={() => setStatus("in_progress")}>▶️ Démarrer</button>}
           {c.status === "in_progress" && <button className="btn-primary" onClick={() => setStatus("done")}>✅ Terminer</button>}
           {c.status === "done" && <button className="btn-ghost" onClick={() => setStatus("in_progress")}>Rouvrir</button>}
+          <Link href={`/app/quitus/nouveau?chantier=${c.id}`} className="btn-ghost col-span-2">✅ Quitus de fin de travaux</Link>
           <button className="btn-ghost" disabled={!!busy || !entries.length} onClick={report}>📄 Rapport photo</button>
         </div>
 

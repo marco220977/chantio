@@ -18,7 +18,7 @@ export async function POST(req: Request) {
 
   const input = await req.json();
   const { docId, pdfBase64, to, origin } = input;
-  if (["contract", "report", "renewal"].includes(input.type)) return sendMaintenance(s, input);
+  if (["contract", "report", "renewal", "reception", "sav"].includes(input.type)) return sendMaintenance(s, input);
   const { data: doc } = await s.from("documents").select("*").eq("id", docId).single();
   if (!doc) return NextResponse.json({ error: "Document introuvable" }, { status: 404 });
   const { data: co } = await s.from("companies").select("*").single();
@@ -87,7 +87,7 @@ function nextTerm(c: any) {
 
 async function sendMaintenance(s: any, body: any) {
   const { type, id, to, pdfBase64 } = body;
-  const table = type === "report" ? "maintenance_reports" : "contracts";
+  const table = ({ report: "maintenance_reports", reception: "receptions", sav: "sav_tickets" } as Record<string, string>)[type] || "contracts";
   const { data: row } = await s.from(table).select("*").eq("id", id).single();
   if (!row) return NextResponse.json({ error: "Document introuvable" }, { status: 404 });
   const { data: co } = await s.from("companies").select("*").single();
@@ -103,6 +103,12 @@ async function sendMaintenance(s: any, body: any) {
   } else if (type === "report") {
     subject = `Attestation d'entretien n° ${row.number} — ${co.name}`;
     content = `<p>Bonjour ${esc(name)},</p><p>Suite à notre visite du ${dfr(row.visit_date)}, veuillez trouver ci-joint l'attestation d'entretien de votre ${equip}. Conservez-la au moins deux ans : elle peut vous être demandée par votre assureur.</p>${row.next_visit_date ? `<p>Prochaine visite conseillée : <b>${dfr(row.next_visit_date)}</b>.</p>` : ""}`;
+  } else if (type === "reception") {
+    subject = `Procès-verbal de réception des travaux n° ${row.number} — ${co.name}`;
+    content = `<p>Bonjour ${esc(name)},</p><p>Veuillez trouver ci-joint le procès-verbal de réception de vos travaux, signé le ${dfr(row.signed_at || row.reception_date)}${row.with_reserves ? ", avec les réserves mentionnées" : ", sans réserve"}.</p><p>Ce document marque le point de départ de vos garanties. Conservez-le précieusement.</p>`;
+  } else if (type === "sav") {
+    subject = `Bon d'intervention SAV n° ${row.number} — ${co.name}`;
+    content = `<p>Bonjour ${esc(name)},</p><p>Veuillez trouver ci-joint le bon de notre intervention${row.resolved_at ? ` du ${dfr(row.resolved_at)}` : ""}.</p>`;
   } else {
     if (row.status !== "active") return NextResponse.json({ error: "Le contrat n'est pas actif." }, { status: 400 });
     const term = nextTerm(row);

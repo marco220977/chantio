@@ -8,7 +8,7 @@ import { contractEnd, EQUIPMENT, equipmentLabel, type Contract, type Equipment, 
 
 const W = 210, M = 15;
 
-async function header(pdf: jsPDF, company: Company, title: string, number: string, meta: string[]) {
+export async function header(pdf: jsPDF, company: Company, title: string, number: string, meta: string[]) {
   let y = M;
   if (company.logo_url) {
     const img = await toDataUrl(company.logo_url);
@@ -26,7 +26,7 @@ async function header(pdf: jsPDF, company: Company, title: string, number: strin
   return Math.max(y + 9 + co.length * 4 + 4, 50);
 }
 
-function box(pdf: jsPDF, x: number, y: number, w: number, title: string, lines: string[]) {
+export function box(pdf: jsPDF, x: number, y: number, w: number, title: string, lines: string[]) {
   const h = 9 + lines.length * 4.2;
   pdf.setDrawColor(220).setFillColor(247, 248, 250).roundedRect(x, y, w, h, 2, 2, "FD");
   pdf.setFont("helvetica", "bold").setFontSize(8).setTextColor(100).text(title.toUpperCase(), x + 3, y + 5);
@@ -34,17 +34,17 @@ function box(pdf: jsPDF, x: number, y: number, w: number, title: string, lines: 
   return h;
 }
 
-const clientLines = (c: any = {}, site?: string) =>
+export const clientLines = (c: any = {}, site?: string) =>
   [c.name, c.address, [c.zip, c.city].filter(Boolean).join(" "), c.phone, c.email,
    site && `Lieu de l'installation : ${site}`].filter(Boolean) as string[];
 
-const equipLines = (e: Equipment) =>
+export const equipLines = (e: Equipment) =>
   [equipmentLabel(e), [e.brand, e.model].filter(Boolean).join(" "), e.serial_number && `N° de série : ${e.serial_number}`,
    [e.power_kw && `Puissance : ${e.power_kw}`, e.year && `Année : ${e.year}`].filter(Boolean).join(" — "),
    e.energy && `Énergie : ${e.energy}`, [e.fluid && `Fluide : ${e.fluid}`, e.fluid_charge_kg && `${e.fluid_charge_kg} kg`].filter(Boolean).join(" — "),
    e.location && `Emplacement : ${e.location}`].filter(Boolean) as string[];
 
-function paragraph(pdf: jsPDF, y: number, title: string, text: string, size = 8.5) {
+export function paragraph(pdf: jsPDF, y: number, title: string, text: string, size = 8.5) {
   if (!text) return y;
   const split = pdf.splitTextToSize(text, W - 2 * M);
   if (y + 6 + split.length * 3.8 > 280) { pdf.addPage(); y = M; }
@@ -53,7 +53,7 @@ function paragraph(pdf: jsPDF, y: number, title: string, text: string, size = 8.
   return y + split.length * 3.8 + 3;
 }
 
-function footer(pdf: jsPDF, company: Company) {
+export function footer(pdf: jsPDF, company: Company) {
   const foot = [company.name, company.legal_form, company.siret && `SIRET ${company.siret}`, company.rcs,
     company.insurance && `Assurance : ${company.insurance}`].filter(Boolean).join(" — ");
   const pages = pdf.getNumberOfPages();
@@ -65,7 +65,7 @@ function footer(pdf: jsPDF, company: Company) {
   pdf.setTextColor(0);
 }
 
-function signatures(pdf: jsPDF, y: number, company: Company, left: string, s: { name?: string; data?: string; at?: string; photo?: string | null }, technician?: string) {
+export function signatures(pdf: jsPDF, y: number, company: Company, left: string, s: { name?: string; data?: string; at?: string; photo?: string | null }, technician?: string) {
   if (y + 45 > 285) { pdf.addPage(); y = M; }
   pdf.setFont("helvetica", "bold").setFontSize(9).text(`Pour ${company.name}`, M, y);
   pdf.setFont("helvetica", "normal").setFontSize(8.5).text(technician ? `Technicien : ${technician}` : "", M, y + 5);

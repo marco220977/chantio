@@ -12,6 +12,7 @@ export default function Dashboard() {
   const [next, setNext] = useState<any[]>([]);
   const [dueVisits, setDueVisits] = useState<any[]>([]);
   const [sites, setSites] = useState<any[]>([]);
+  const [sav, setSav] = useState<any[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -26,6 +27,8 @@ export default function Dashboard() {
       setDueVisits(ct || []);
       const { data: ch } = await s.from("chantiers").select("id, title, client_snapshot").eq("status", "in_progress").order("created_at", { ascending: false }).limit(3);
       setSites(ch || []);
+      const { data: sv } = await s.from("sav_tickets").select("id, priority, client_snapshot").not("status", "in", "(resolved,closed)");
+      setSav(sv || []);
     })();
   }, []);
 
@@ -66,6 +69,13 @@ export default function Dashboard() {
       {company && !company.siret && (
         <Link href="/app/parametres" className="card block border-amber-300 bg-amber-50 text-sm">
           ⚠️ Complétez vos informations légales (SIRET, adresse, assurance décennale) pour des documents conformes →
+        </Link>
+      )}
+
+      {sav.length > 0 && (
+        <Link href="/app/sav" className={`card block ${sav.some((x) => x.priority === "urgent") ? "border-red-300 bg-red-50" : ""}`}>
+          <p className="font-bold">🛠 {sav.length} SAV en cours{sav.some((x) => x.priority === "urgent") ? ` dont ${sav.filter((x) => x.priority === "urgent").length} urgent(s)` : ""}</p>
+          <p className="text-sm text-slate-600">{sav.slice(0, 3).map((x) => x.client_snapshot?.name).join(", ")}</p>
         </Link>
       )}
 

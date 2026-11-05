@@ -348,3 +348,6 @@ insert into storage.buckets (id, name, public) values ('chantiers', 'chantiers',
 create policy chantiers_read on storage.objects for select to authenticated using (bucket_id = 'chantiers' and (storage.foldername(name))[1] = my_company_id()::text);
 create policy chantiers_insert on storage.objects for insert to authenticated with check (bucket_id = 'chantiers' and (storage.foldername(name))[1] = my_company_id()::text);
 create policy chantiers_delete on storage.objects for delete to authenticated using (bucket_id = 'chantiers' and (storage.foldername(name))[1] = my_company_id()::text);
+
+-- ---------- V1.5 : quitus (PV de réception) et SAV ----------
+-- (voir migration "quitus_sav" : tables receptions et sav_tickets, RLS tenant_rw)
