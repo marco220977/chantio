@@ -8,7 +8,7 @@ const tabs = [
   { href: "/app/devis", label: "Devis", icon: "📝" },
   { href: "/app/factures", label: "Factures", icon: "💶" },
   { href: "/app/entretien", label: "Entretien", icon: "🔧" },
-  { href: "/app/planning", label: "Planning", icon: "🗓" },
+  { href: "/app/chantiers", label: "Chantiers", icon: "🏗️" },
   { href: "/app/menu", label: "Menu", icon: "☰" },
 ];
 

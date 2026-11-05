@@ -390,6 +390,7 @@ function Editor() {
           {doc.id && isQuote && <button className="btn-ghost w-full" onClick={duplicate}>Dupliquer</button>}
           {doc.id && isQuote && editable && <button className="btn-ghost w-full" onClick={() => save({ status: "refused" })}>Marquer refusé</button>}
           {doc.id && doc.status === "draft" && <button className="btn-danger w-full" onClick={remove}>Supprimer le brouillon</button>}
+          {doc.id && isQuote && ["signed", "invoiced"].includes(doc.status) && <Link href={`/app/chantiers/nouveau?doc=${doc.id}`} className="btn-ghost w-full">🏗️ Ouvrir le suivi de chantier</Link>}
           {doc.id && doc.client_id && <Link href={`/app/planning?doc=${doc.id}&client=${doc.client_id}`} className="btn-ghost w-full">🗓 Planifier l'intervention</Link>}
         </section>
       </div>

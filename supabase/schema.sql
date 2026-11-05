@@ -324,3 +324,27 @@ alter table contracts enable row level security;
 alter table maintenance_reports enable row level security;
 create policy tenant_rw on contracts for all using (company_id = my_company_id()) with check (company_id = my_company_id());
 create policy tenant_rw on maintenance_reports for all using (company_id = my_company_id()) with check (company_id = my_company_id());
+
+-- ---------- V1.4 : suivi de chantier avec photos ----------
+create table if not exists chantiers (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null default my_company_id() references companies(id) on delete cascade,
+  created_at timestamptz default now(), title text not null, status text not null default 'planned',
+  client_id uuid references clients(id) on delete set null, client_snapshot jsonb,
+  document_id uuid references documents(id) on delete set null, address text, start_date date, end_date date,
+  notes text, cover_path text
+);
+create table if not exists chantier_entries (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null default my_company_id() references companies(id) on delete cascade,
+  chantier_id uuid not null references chantiers(id) on delete cascade, created_at timestamptz default now(),
+  author text, tag text default 'pendant', text text, photos jsonb not null default '[]'
+);
+alter table chantiers enable row level security;
+alter table chantier_entries enable row level security;
+create policy tenant_rw on chantiers for all using (company_id = my_company_id()) with check (company_id = my_company_id());
+create policy tenant_rw on chantier_entries for all using (company_id = my_company_id()) with check (company_id = my_company_id());
+insert into storage.buckets (id, name, public) values ('chantiers', 'chantiers', false) on conflict (id) do nothing;
+create policy chantiers_read on storage.objects for select to authenticated using (bucket_id = 'chantiers' and (storage.foldername(name))[1] = my_company_id()::text);
+create policy chantiers_insert on storage.objects for insert to authenticated with check (bucket_id = 'chantiers' and (storage.foldername(name))[1] = my_company_id()::text);
+create policy chantiers_delete on storage.objects for delete to authenticated using (bucket_id = 'chantiers' and (storage.foldername(name))[1] = my_company_id()::text);

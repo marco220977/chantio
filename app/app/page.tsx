@@ -11,6 +11,7 @@ export default function Dashboard() {
   const [docs, setDocs] = useState<Doc[]>([]);
   const [next, setNext] = useState<any[]>([]);
   const [dueVisits, setDueVisits] = useState<any[]>([]);
+  const [sites, setSites] = useState<any[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -23,6 +24,8 @@ export default function Dashboard() {
       const in30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
       const { data: ct } = await s.from("contracts").select("id, client_snapshot, next_visit_date, equipment").eq("status", "active").lte("next_visit_date", in30).order("next_visit_date");
       setDueVisits(ct || []);
+      const { data: ch } = await s.from("chantiers").select("id, title, client_snapshot").eq("status", "in_progress").order("created_at", { ascending: false }).limit(3);
+      setSites(ch || []);
     })();
   }, []);
 
@@ -71,6 +74,20 @@ export default function Dashboard() {
           <p className="font-bold">🔧 {dueVisits.length} entretien{dueVisits.length > 1 ? "s" : ""} sous contrat à planifier</p>
           <p className="text-sm text-slate-600">{dueVisits.slice(0, 3).map((c) => c.client_snapshot?.name).join(", ")}{dueVisits.length > 3 ? "…" : ""}</p>
         </Link>
+      )}
+
+      {sites.length > 0 && (
+        <section>
+          <h2 className="mb-2 font-bold">Chantiers en cours</h2>
+          <div className="space-y-2">
+            {sites.map((c) => (
+              <Link key={c.id} href={`/app/chantiers/${c.id}`} className="card flex items-center justify-between py-3">
+                <div className="min-w-0"><p className="truncate font-semibold">🏗️ {c.title}</p><p className="truncate text-xs text-slate-500">{c.client_snapshot?.name}</p></div>
+                <span className="text-sm text-flame">📷 →</span>
+              </Link>
+            ))}
+          </div>
+        </section>
       )}
 
       <section>
