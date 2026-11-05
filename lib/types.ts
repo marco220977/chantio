@@ -34,5 +34,5 @@ export type Doc = {
   discount_pct?: number; deposit_pct?: number; total_ht?: number; total_vat?: number;
   total_ttc?: number; notes?: string; public_token?: string; signed_at?: string;
   signer_name?: string; signature_data?: string; signer_photo?: string | null; source_quote_id?: string;
-  paid_at?: string; payment_method?: string; created_at?: string;
+  paid_at?: string; payment_method?: string; created_at?: string; sent_at?: string; sent_to?: string;
 };

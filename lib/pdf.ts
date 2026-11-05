@@ -170,3 +170,8 @@ export async function sharePdf(doc: Doc, company: Company) {
     pdf.save(file.name);
   }
 }
+
+export async function pdfBase64(doc: Doc, company: Company): Promise<string> {
+  const pdf = await buildPdf(doc, company);
+  return pdf.output("datauristring").split(",")[1];
+}

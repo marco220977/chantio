@@ -291,3 +291,7 @@ begin
   return found;
 end $$;
 grant execute on function sign_public_quote(uuid, text, text, text, text) to anon, authenticated;
+
+-- ---------- V1.2 : suivi des envois ----------
+alter table documents add column if not exists sent_at timestamptz;
+alter table documents add column if not exists sent_to text;

@@ -4,7 +4,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { sb } from "@/lib/supabase";
 import { addDays, computeTotals, dateFr, eur, STATUS_COLOR, STATUS_LABEL, VAT_RATES } from "@/lib/calc";
-import { downloadPdf, sharePdf } from "@/lib/pdf";
+import { downloadPdf, pdfBase64, sharePdf } from "@/lib/pdf";
 import { useCompany } from "@/components/CompanyContext";
 import Header from "@/components/Header";
 import Modal from "@/components/Modal";
@@ -28,6 +28,7 @@ function Editor() {
   const [err, setErr] = useState("");
   const [catQ, setCatQ] = useState("");
   const [newClient, setNewClient] = useState<Partial<Client>>({ type: "particulier" });
+  const [toast, setToast] = useState("");
 
   useEffect(() => {
     const s = sb();
@@ -105,7 +106,8 @@ function Editor() {
     if (!confirm("Émettre la facture ? Elle recevra un numéro définitif et ne pourra plus être modifiée.")) return;
     const { data: num, error } = await sb().rpc("next_number", { p_kind: doc!.kind === "credit" ? "A" : "F" });
     if (error) return setErr(error.message);
-    await save({ number: num as string, status: "issued", issue_date: addDays(0) });
+    const issued = await save({ number: num as string, status: "issued", issue_date: addDays(0) });
+    if (issued) await sendEmail(issued);
   }
 
   async function toInvoice() {
@@ -178,6 +180,37 @@ function Editor() {
     setNewClient({ type: "particulier" }); setModal("");
   }
 
+  async function updateClient(patch: Partial<Client>) {
+    if (!client) return;
+    const { data } = await sb().from("clients").update(patch).eq("id", client.id).select().single();
+    if (data) setClients(clients.map((c) => (c.id === data.id ? data : c)));
+  }
+
+  async function sendEmail(target?: Doc) {
+    let d = target || doc!;
+    if (d.kind === "quote" && editable) { const saved = await save(); if (!saved) return; d = saved; }
+    let to = client?.email || d.client_snapshot?.email || "";
+    if (!to) {
+      to = (prompt("Adresse e-mail du client ?") || "").trim();
+      if (!to) return;
+      await updateClient({ email: to });
+    }
+    if (!confirm(`Envoyer ${d.kind === "quote" ? "le devis" : d.kind === "credit" ? "l'avoir" : "la facture"} ${d.number} à ${to} ?`)) return;
+    setBusy(true); setErr("");
+    try {
+      const { data: { session } } = await sb().auth.getSession();
+      const r = await fetch("/api/send-document", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ docId: d.id, to, origin: location.origin, pdfBase64: await pdfBase64(d, company!) }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) setErr(j.error || "Échec de l'envoi");
+      else { if (j.doc) setDoc(j.doc); setModal(""); setToast(`✅ Envoyé à ${to}`); setTimeout(() => setToast(""), 4000); }
+    } catch { setErr("Échec de l'envoi (réseau)"); }
+    setBusy(false);
+  }
+
   const title = doc.kind === "quote" ? "Devis" : doc.kind === "credit" ? "Avoir" : "Facture";
   const relance = () => {
     const body = `Bonjour,\n\nSauf erreur de notre part, la facture ${doc.number} du ${dateFr(doc.issue_date)} d'un montant de ${eur(doc.total_ttc)} arrivée à échéance le ${dateFr(doc.due_date)} reste impayée.\n\nMerci de procéder au règlement${company.iban ? ` par virement (IBAN ${company.iban})` : ""}.\n\nCordialement,\n${company.name}`;
@@ -190,6 +223,7 @@ function Editor() {
         right={<span className={`chip ${STATUS_COLOR[doc.status]}`}>{STATUS_LABEL[doc.status]}</span>} />
       <div className="space-y-4 p-4">
         {err && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
+        {toast && <p className="fixed inset-x-4 top-4 z-50 rounded-xl bg-ink p-3 text-center text-sm font-semibold text-white shadow-lg">{toast}</p>}
 
         {/* Client */}
         <section className="card space-y-3">
@@ -208,6 +242,27 @@ function Editor() {
           ) : (
             <p className="font-semibold">{doc.client_snapshot?.name}<br /><span className="text-sm font-normal text-slate-500">{[doc.client_snapshot?.address, doc.client_snapshot?.zip, doc.client_snapshot?.city].filter(Boolean).join(" ")}</span></p>
           )}
+          {client && (
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="label">Téléphone</label>
+                <div className="flex gap-1">
+                  <input className="input" type="tel" inputMode="tel" defaultValue={client.phone || ""} key={`p${client.id}`}
+                    onBlur={(e) => e.target.value !== (client.phone || "") && updateClient({ phone: e.target.value })} />
+                  {client.phone && <a href={`tel:${client.phone}`} className="btn-ghost !px-2">📞</a>}
+                </div>
+              </div>
+              <div>
+                <label className="label">E-mail</label>
+                <input className="input" type="email" inputMode="email" defaultValue={client.email || ""} key={`e${client.id}`}
+                  onBlur={(e) => e.target.value !== (client.email || "") && updateClient({ email: e.target.value.trim() })} />
+              </div>
+            </div>
+          )}
+          {!client && doc.client_snapshot && (doc.client_snapshot.phone || doc.client_snapshot.email) && (
+            <p className="text-sm text-slate-500">{[doc.client_snapshot.phone, doc.client_snapshot.email].filter(Boolean).join(" · ")}</p>
+          )}
+          {doc.sent_at && <p className="text-xs text-green-700">📧 Envoyé le {new Date(doc.sent_at).toLocaleString("fr-FR")} à {doc.sent_to}</p>}
           <div><label className="label">Objet</label><input className="input" disabled={!editable} placeholder="Ex : Remplacement chaudière gaz" value={doc.title || ""} onChange={(e) => set({ title: e.target.value })} /></div>
           <div><label className="label">Adresse du chantier</label><input className="input" disabled={!editable} value={doc.site_address || ""} onChange={(e) => set({ site_address: e.target.value })} /></div>
           <div className="grid grid-cols-2 gap-3">
@@ -302,7 +357,7 @@ function Editor() {
           {doc.id && isQuote && editable && (
             <div className="grid grid-cols-2 gap-2">
               <button className="btn-brand" onClick={async () => { if (await save()) setModal("sign"); }}>✍️ Faire signer</button>
-              <button className="btn-ghost" onClick={async () => { if (await save()) setModal("send"); }}>🔗 Envoyer le lien</button>
+              <button className="btn-ghost" onClick={async () => { if (await save()) setModal("send"); }}>📧 Envoyer</button>
             </div>
           )}
           {doc.id && isQuote && ["signed", "sent", "draft"].includes(doc.status) && (
@@ -312,13 +367,16 @@ function Editor() {
             <button className="btn-ghost w-full" onClick={depositInvoice}>Facture d'acompte</button>
           )}
           {doc.id && !isQuote && doc.status === "draft" && (
-            <button className="btn-brand w-full py-3.5" onClick={issueInvoice}>✅ Émettre {doc.kind === "credit" ? "l'avoir" : "la facture"}</button>
+            <button className="btn-brand w-full py-3.5" onClick={issueInvoice}>✅ Émettre et envoyer {doc.kind === "credit" ? "l'avoir" : "la facture"}</button>
           )}
           {doc.kind === "invoice" && doc.status === "issued" && (
             <div className="grid grid-cols-2 gap-2">
               <button className="btn-brand" onClick={() => setModal("pay")}>💶 Marquer payée</button>
               <button className="btn-ghost" onClick={relance}>📧 Relancer</button>
             </div>
+          )}
+          {doc.kind !== "quote" && doc.status !== "draft" && (
+            <button className="btn-primary w-full" disabled={busy} onClick={() => sendEmail()}>📧 {doc.sent_at ? "Renvoyer" : "Envoyer"} par e-mail</button>
           )}
           {doc.kind === "invoice" && ["issued", "paid"].includes(doc.status) && (
             <button className="btn-ghost w-full" onClick={creditNote}>Créer un avoir</button>
@@ -381,13 +439,12 @@ function Editor() {
           <p className="mb-3 text-sm text-slate-600">Le client ouvre le lien, consulte le devis et signe depuis son téléphone.</p>
           <input className="input mb-3 text-xs" readOnly value={publicUrl} onFocus={(e) => e.target.select()} />
           <div className="grid gap-2">
+            <button className="btn-brand" disabled={busy} onClick={() => sendEmail()}>📧 Envoyer par e-mail{client?.email ? ` à ${client.email}` : ""}</button>
             <button className="btn-ghost" onClick={async () => { await navigator.clipboard.writeText(publicUrl); await save({ status: "sent" }); alert("Lien copié"); }}>📋 Copier le lien</button>
             <a className="btn-ghost" onClick={() => save({ status: "sent" })} target="_blank" rel="noreferrer"
               href={`https://wa.me/${(client?.phone || "").replace(/\D/g, "").replace(/^0/, "33")}?text=${encodeURIComponent(`Bonjour, voici votre devis ${doc.number} de ${company.name} (${eur(totals.ttc)} TTC). Vous pouvez le consulter et le signer ici : ${publicUrl}`)}`}>💬 WhatsApp</a>
             <a className="btn-ghost" onClick={() => save({ status: "sent" })}
               href={`sms:${client?.phone || ""}?body=${encodeURIComponent(`Votre devis ${company.name} : ${publicUrl}`)}`}>📱 SMS</a>
-            <a className="btn-ghost" onClick={() => save({ status: "sent" })}
-              href={`mailto:${client?.email || ""}?subject=${encodeURIComponent(`Devis ${doc.number} — ${company.name}`)}&body=${encodeURIComponent(`Bonjour,\n\nVeuillez trouver votre devis n° ${doc.number} d'un montant de ${eur(totals.ttc)} TTC.\nVous pouvez le consulter et le signer en ligne :\n${publicUrl}\n\nCordialement,\n${company.name}`)}`}>📧 E-mail</a>
           </div>
         </Modal>
       )}
