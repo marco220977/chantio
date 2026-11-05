@@ -27,6 +27,8 @@ export default function Catalogue() {
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [edit, setEdit] = useState<Partial<CatalogItem> | null>(null);
   const [q, setQ] = useState("");
+  const [cat, setCat] = useState("all");
+  const [msg, setMsg] = useState("");
   const load = () => sb().from("catalog_items").select("*").order("category").order("label").then(({ data }) => setItems(data || []));
   useEffect(() => { load(); }, []);
 
@@ -38,10 +40,15 @@ export default function Catalogue() {
     setEdit(null); load();
   }
   async function del() { if (edit?.id && confirm("Supprimer ?")) { await sb().from("catalog_items").delete().eq("id", edit.id); setEdit(null); load(); } }
-  async function starter() { await sb().from("catalog_items").insert(STARTER); load(); }
+  async function starter() {
+    const { data, error } = await sb().rpc("complete_my_catalog");
+    if (error) { await sb().from("catalog_items").insert(STARTER); }
+    setMsg(error ? "" : `✅ ${data || 0} article(s) ajouté(s)`); setTimeout(() => setMsg(""), 4000);
+    load();
+  }
 
   const cats = Array.from(new Set(items.map((i) => i.category)));
-  const shown = items.filter((i) => !q || `${i.label} ${i.category}`.toLowerCase().includes(q.toLowerCase()));
+  const shown = items.filter((i) => (cat === "all" || i.category === cat) && (!q || `${i.label} ${i.category}`.toLowerCase().includes(q.toLowerCase())));
 
   return (
     <>
@@ -50,10 +57,19 @@ export default function Catalogue() {
         {items.length === 0 && (
           <div className="card text-center">
             <p className="mb-3 text-sm text-slate-600">Démarrez avec un catalogue type plomberie/chauffage (prix modifiables).</p>
-            <button className="btn-primary w-full" onClick={starter}>Charger le catalogue de départ</button>
+            <button className="btn-primary w-full" onClick={starter}>Charger le catalogue type (170 articles)</button>
           </div>
         )}
-        {items.length > 0 && <input className="input" placeholder="Rechercher…" value={q} onChange={(e) => setQ(e.target.value)} />}
+        {msg && <p className="rounded-xl bg-green-50 p-3 text-sm text-green-800">{msg}</p>}
+        {items.length > 0 && <input className="input" placeholder={`Rechercher parmi ${items.length} articles…`} value={q} onChange={(e) => setQ(e.target.value)} />}
+        {items.length > 0 && (
+          <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1">
+            {["all", ...cats].map((c) => (
+              <button key={c} onClick={() => setCat(c)} className={`chip whitespace-nowrap border py-1.5 ${cat === c ? "border-ink bg-ink text-white" : "border-slate-200 bg-white"}`}>{c === "all" ? "Tout" : c}</button>
+            ))}
+          </div>
+        )}
+        {items.length > 0 && <button className="btn-ghost w-full text-sm" onClick={starter}>📚 Compléter avec le catalogue type (sans toucher à mes prix)</button>}
         {cats.map((c) => {
           const rows = shown.filter((i) => i.category === c);
           if (!rows.length) return null;

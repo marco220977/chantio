@@ -27,6 +27,7 @@ function Editor() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [catQ, setCatQ] = useState("");
+  const [catCat, setCatCat] = useState("all");
   const [newClient, setNewClient] = useState<Partial<Client>>({ type: "particulier" });
   const [toast, setToast] = useState("");
   const [showMargin, setShowMargin] = useState(false);
@@ -399,9 +400,20 @@ function Editor() {
       {modal === "catalog" && (
         <Modal title="Catalogue" onClose={() => setModal("")}>
           <input className="input mb-3" placeholder="Rechercher…" value={catQ} onChange={(e) => setCatQ(e.target.value)} />
-          {catalog.length === 0 && <p className="text-sm text-slate-500">Catalogue vide. <Link href="/app/catalogue" className="text-brand">Ajouter des prestations →</Link></p>}
+          {catalog.length === 0 && (
+            <button className="btn-primary w-full" onClick={async () => { await sb().rpc("complete_my_catalog"); const { data } = await sb().from("catalog_items").select("*").order("category").order("label"); setCatalog(data || []); }}>
+              📚 Charger le catalogue type
+            </button>
+          )}
+          {catalog.length > 0 && (
+            <div className="-mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-1">
+              {["all", ...Array.from(new Set(catalog.map((c) => c.category)))].map((c) => (
+                <button key={c} onClick={() => setCatCat(c)} className={`chip whitespace-nowrap border py-1.5 ${catCat === c ? "border-ink bg-ink text-white" : "border-slate-200 bg-white"}`}>{c === "all" ? "Tout" : c}</button>
+              ))}
+            </div>
+          )}
           <div className="space-y-2">
-            {catalog.filter((c) => !catQ || `${c.label} ${c.category}`.toLowerCase().includes(catQ.toLowerCase())).map((c) => (
+            {catalog.filter((c) => (catCat === "all" || c.category === catCat) && (!catQ || `${c.label} ${c.category}`.toLowerCase().includes(catQ.toLowerCase()))).map((c) => (
               <button key={c.id} className="card w-full text-left" onClick={() => {
                 set({ lines: [...doc.lines, { label: c.label, description: c.description, qty: 1, unit: c.unit, unit_price: Number(c.unit_price), vat_rate: Number(c.vat_rate), cost_price: Number(c.cost_price) || 0 }] });
                 setModal("");
