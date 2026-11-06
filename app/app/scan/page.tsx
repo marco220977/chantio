@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Header from "@/components/Header";
-import { sb } from "@/lib/supabase";
+import { scanPlate } from "@/lib/scan";
 
 type Result = { brand?: string; model?: string; type?: string; energy?: string; power_kw?: string; serial_number?: string; year?: string; other?: string; confidence?: string };
 
@@ -22,12 +22,9 @@ export default function Scan() {
   async function onFile(f: File) {
     setErr(""); setRes(null); setBusy(true);
     const data = await resize(f); setPreview(data);
-    const { data: { session } } = await sb().auth.getSession();
-    const r = await fetch("/api/scan-plaque", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` }, body: JSON.stringify({ image: data }) });
-    const j = await r.json();
+    try { setRes(await scanPlate(data)); }
+    catch (e: any) { setErr(e.message || "Erreur d'analyse"); }
     setBusy(false);
-    if (!r.ok) return setErr(j.error || "Erreur d'analyse");
-    setRes(j);
   }
 
   const rows: [keyof Result, string][] = [["brand", "Marque"], ["model", "Modèle"], ["type", "Type"], ["energy", "Énergie"], ["power_kw", "Puissance"], ["serial_number", "N° de série"], ["year", "Année"], ["other", "Autres infos"]];

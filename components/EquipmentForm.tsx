@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { sb } from "@/lib/supabase";
+import { scanPlate } from "@/lib/scan";
 import { EQUIPMENT, type Equipment } from "@/lib/maintenance";
 
 async function resize(file: File): Promise<string> {
@@ -29,10 +29,7 @@ export default function EquipmentForm({ value, onChange, disabled }: { value: Eq
   async function scan(f: File) {
     setBusy(true); setErr("");
     try {
-      const { data: { session } } = await sb().auth.getSession();
-      const r = await fetch("/api/scan-plaque", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` }, body: JSON.stringify({ image: await resize(f) }) });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error);
+      const j = await scanPlate(await resize(f));
       const fluid = /R ?-?\d{2,4}[A-Z]?/i.exec(j.other || "")?.[0];
       onChange({
         ...value,
