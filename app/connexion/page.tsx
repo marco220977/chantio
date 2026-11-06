@@ -1,5 +1,5 @@
 "use client";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { sb } from "@/lib/supabase";
 
@@ -18,6 +18,9 @@ function Form() {
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
   const [accept, setAccept] = useState(false);
+  const parrain = (params.get("parrain") || "").toUpperCase();
+  const [parrainName, setParrainName] = useState("");
+  useEffect(() => { if (parrain) sb().rpc("referral_info", { p_code: parrain }).then(({ data }) => setParrainName(data?.name || "")); }, [parrain]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setBusy(true); setMsg("");
@@ -25,7 +28,7 @@ function Form() {
     if (signup) {
       const { data, error } = await s.auth.signUp({
         email, password,
-        options: { data: { company_name: company, full_name: name }, emailRedirectTo: `${location.origin}/app` },
+        options: { data: { company_name: company, full_name: name, ...(parrainName ? { referral_code: parrain } : {}) }, emailRedirectTo: `${location.origin}/app` },
       });
       if (error) setMsg(frError(error.message));
       else if (!data.session) setMsg("Compte créé ! Confirmez votre adresse via l'e-mail reçu, puis connectez-vous.");
@@ -48,6 +51,7 @@ function Form() {
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-100 to-orange-50 p-5">
       <form onSubmit={submit} className="card w-full max-w-sm space-y-4 p-6">
         <h1 className="text-2xl font-extrabold">{signup ? "Créer mon compte" : "Connexion"}</h1>
+        {signup && parrainName && <p className="rounded-lg bg-green-50 p-3 text-sm text-green-800">🎁 Invité par <b>{parrainName}</b> : <b>30 jours d'essai gratuit</b> au lieu de 14.</p>}
         {signup && (
           <>
             <div><label className="label">Nom de l'entreprise</label><input className="input" required value={company} onChange={(e) => setCompany(e.target.value)} /></div>

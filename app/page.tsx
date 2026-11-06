@@ -11,7 +11,8 @@ const features = [
   ["📚", "Catalogue", "Vos prestations et fournitures avec prix d'achat pour suivre la marge."],
 ];
 
-export default function Home({ searchParams }: { searchParams: { compte?: string } }) {
+export default function Home({ searchParams }: { searchParams: { compte?: string; parrain?: string } }) {
+  const signup = `/connexion?mode=signup${searchParams?.parrain ? `&parrain=${encodeURIComponent(searchParams.parrain)}` : ""}`;
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-100 via-white to-orange-50">
       <div className="mx-auto max-w-3xl px-5 pb-16">
@@ -32,11 +33,11 @@ export default function Home({ searchParams }: { searchParams: { compte?: string
             Créez le devis devant le client, faites-le signer sur votre téléphone, transformez-le en facture en un clic.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
-            <Link href="/connexion?mode=signup" className="btn bg-gradient-to-r from-ink to-brand py-4 text-lg text-white">
+            <Link href={signup} className="btn bg-gradient-to-r from-ink to-brand py-4 text-lg text-white">
               Essai gratuit 14 jours →
             </Link>
           </div>
-          <p className="mt-3 text-sm text-slate-500">Sans carte bancaire. Annulable à tout moment.</p>
+          <p className="mt-3 text-sm text-slate-500">{searchParams?.parrain ? "🎁 Parrainage : 30 jours d'essai offerts. " : ""}Sans carte bancaire. Annulable à tout moment.</p>
         </section>
 
         <section className="mt-16 grid gap-4 sm:grid-cols-2">
@@ -53,7 +54,7 @@ export default function Home({ searchParams }: { searchParams: { compte?: string
           <h2 className="text-2xl font-extrabold">Un seul tarif, tout compris</h2>
           <p className="mt-3 text-4xl font-extrabold">29 €<span className="text-base font-medium text-slate-500"> HT / mois</span></p>
           <p className="mt-2 text-slate-600">Devis et factures illimités, signature, planning, scan de plaque.</p>
-          <Link href="/connexion?mode=signup" className="btn-brand mt-6 w-full py-3.5">Commencer gratuitement</Link>
+          <Link href={signup} className="btn-brand mt-6 w-full py-3.5">Commencer gratuitement</Link>
         </section>
 
         <footer className="mt-16 space-y-2 text-center text-xs text-slate-400">

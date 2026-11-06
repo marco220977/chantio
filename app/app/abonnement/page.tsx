@@ -3,6 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useCompany } from "@/components/CompanyContext";
 import Header from "@/components/Header";
+import ReferralCard from "@/components/ReferralCard";
 import { dateFr } from "@/lib/calc";
 
 export default function Abonnement() {
@@ -70,6 +71,8 @@ export default function Abonnement() {
               : <button className="btn-danger w-full" disabled={busy} onClick={unsubscribe}>Se désabonner</button>}
           </div>
         )}
+
+        <ReferralCard company={company} />
 
         <p className="pt-4 text-center text-sm text-slate-500">Vous voulez effacer toutes vos données ? <Link href="/app/parametres#suppression" className="text-brand underline">Supprimer mon compte</Link></p>
       </div>
