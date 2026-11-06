@@ -9,6 +9,7 @@ import { useCompany } from "@/components/CompanyContext";
 import Header from "@/components/Header";
 import Modal from "@/components/Modal";
 import SignaturePad from "@/components/SignaturePad";
+import SiretField from "@/components/SiretField";
 import type { CatalogItem, Client, Doc, Line } from "@/lib/types";
 
 const emptyLine = (): Line => ({ label: "", qty: 1, unit: "u", unit_price: 0, vat_rate: 10 });
@@ -466,7 +467,11 @@ function Editor() {
               <input className="input" placeholder="CP" inputMode="numeric" value={newClient.zip || ""} onChange={(e) => setNewClient({ ...newClient, zip: e.target.value })} />
               <input className="input col-span-2" placeholder="Ville" value={newClient.city || ""} onChange={(e) => setNewClient({ ...newClient, city: e.target.value })} />
             </div>
-            {newClient.type === "professionnel" && <input className="input" placeholder="SIREN / SIRET" value={newClient.siret || ""} onChange={(e) => setNewClient({ ...newClient, siret: e.target.value })} />}
+            {newClient.type === "professionnel" && (
+              <SiretField label="SIRET du client" value={newClient.siret || ""} onChange={(v) => setNewClient({ ...newClient, siret: v })}
+                onVerified={(i) => setNewClient({ ...newClient, siret: i.siret || newClient.siret, siret_verified_at: new Date().toISOString(),
+                  name: newClient.name || i.name, address: newClient.address || i.address, zip: newClient.zip || i.zip, city: newClient.city || i.city })} />
+            )}
             <button className="btn-primary w-full" onClick={addClient}>Ajouter</button>
           </div>
         </Modal>

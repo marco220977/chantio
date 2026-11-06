@@ -371,3 +371,6 @@ create policy chantiers_delete on storage.objects for delete to authenticated us
 -- ---------- V1.10 : numérotation personnalisable ----------
 -- voir migration "numbering_settings" : table numbering_settings, format_number(), next_number() avec préfixe,
 -- get_numbering(), set_numbering() (verrouillé pour factures/avoirs après la première émission)
+
+-- ---------- V1.11 : vérification SIRET ----------
+-- companies.siret_verified_at, companies.naf, clients.siret_verified_at, fonction siret_in_use()

@@ -6,6 +6,7 @@ import Header from "@/components/Header";
 import Modal from "@/components/Modal";
 import type { Client } from "@/lib/types";
 import { useCompany } from "@/components/CompanyContext";
+import SiretField from "@/components/SiretField";
 
 export default function Clients() {
   const [list, setList] = useState<Client[]>([]);
@@ -61,7 +62,11 @@ export default function Clients() {
             </select>
             {f("name", "Nom / raison sociale *")}{f("phone", "Téléphone", "tel")}{f("email", "E-mail", "email")}{f("address", "Adresse")}
             <div className="grid grid-cols-3 gap-2">{f("zip", "CP")}<div className="col-span-2">{f("city", "Ville")}</div></div>
-            {edit.type === "professionnel" && f("siret", "SIREN / SIRET")}
+            {edit.type === "professionnel" && (
+              <SiretField label="SIRET du client" value={edit.siret || ""} onChange={(v) => setEdit({ ...edit, siret: v, siret_verified_at: null })}
+                onVerified={(i) => setEdit({ ...edit, siret: i.siret || edit.siret, siret_verified_at: new Date().toISOString(),
+                  name: edit.name || i.name, address: edit.address || i.address, zip: edit.zip || i.zip, city: edit.city || i.city })} />
+            )}
             <textarea className="input" rows={2} placeholder="Notes (code portail, matériel en place…)" value={edit.notes || ""} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} />
             <button className="btn-primary w-full" onClick={save}>Enregistrer</button>
             {edit.id && <button className="btn-danger w-full" onClick={del}>Supprimer</button>}

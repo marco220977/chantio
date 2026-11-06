@@ -66,6 +66,11 @@ function SupDashboard() {
         <Stat label="Signés à facturer" value={toInvoice.length} sub={eur(toInvoice.reduce((s, d) => s + Number(d.total_ttc), 0))} href="/app/devis" />
       </div>
 
+      {company && company.siret && !company.siret_verified_at && (
+        <Link href="/app/parametres" className="card block border-amber-300 bg-amber-50 text-sm">
+          🔎 Votre SIRET n'est pas encore vérifié au registre officiel. Vérifiez-le en 1 clic dans Mon entreprise →
+        </Link>
+      )}
       {company && !company.siret && (
         <Link href="/app/parametres" className="card block border-amber-300 bg-amber-50 text-sm">
           ⚠️ Complétez vos informations légales (SIRET, adresse, assurance décennale) pour des documents conformes →

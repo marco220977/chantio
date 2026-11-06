@@ -6,6 +6,7 @@ import { sb } from "@/lib/supabase";
 import { useCompany } from "@/components/CompanyContext";
 import Header from "@/components/Header";
 import NumberingSection from "@/components/NumberingSection";
+import SiretField from "@/components/SiretField";
 import type { Company } from "@/lib/types";
 
 function Settings() {
@@ -123,7 +124,16 @@ function Settings() {
               </select></div>
             {F({ k: "capital", label: "Capital", ph: "ex. 1 000 €" })}
           </div>
-          {F({ k: "siret", label: "SIRET", ph: "14 chiffres" })}
+          <SiretField value={c.siret || ""} checkDuplicate
+            onChange={(v) => setC({ ...c, siret: v, siret_verified_at: null })}
+            onVerified={(i) => {
+              const fill = !c.address || confirm(`Remplir automatiquement avec les informations officielles ?\n${i.name}\n${[i.address, i.zip, i.city].filter(Boolean).join(" ")}`);
+              setC({ ...c, siret: i.siret || c.siret, siret_verified_at: new Date().toISOString(), naf: i.naf || null,
+                ...(fill ? { name: c.name && c.name !== "Mon entreprise" ? c.name : i.name, legal_form: i.legal_form || c.legal_form,
+                  address: i.address || c.address, zip: i.zip || c.zip, city: i.city || c.city,
+                  vat_number: c.vat_exempt ? c.vat_number : c.vat_number || i.vat_number } : {}) });
+            }} />
+          {c.siret_verified_at && <p className="-mt-2 text-xs text-green-700">✔ SIRET vérifié le {new Date(c.siret_verified_at).toLocaleDateString("fr-FR")} — pensez à enregistrer</p>}
           {F({ k: "rcs", label: "RCS / RM", ph: "ex. RM 123 456 789 Créteil" })}
           {F({ k: "vat_number", label: "N° TVA intracommunautaire", ph: "FR..." })}
           <label className="flex items-center gap-2 text-sm">
