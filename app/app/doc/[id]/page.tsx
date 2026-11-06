@@ -44,6 +44,8 @@ function Editor() {
   }, [catQ, modal]);
   const [newClient, setNewClient] = useState<Partial<Client>>({ type: "particulier" });
   const [toast, setToast] = useState("");
+  const [amendments, setAmendments] = useState<Doc[]>([]);
+  const [parent, setParent] = useState<Doc | null>(null);
   const [showMargin, setShowMargin] = useState(false);
 
   useEffect(() => {
@@ -56,7 +58,15 @@ function Editor() {
       try { dup = JSON.parse(sessionStorage.getItem("dup") || "{}"); sessionStorage.removeItem("dup"); } catch {}
       setDoc({ id: "", kind, status: "draft", lines: [], issue_date: addDays(0), client_id: params.get("client") || undefined, ...dup });
     } else {
-      s.from("documents").select("*").eq("id", id).single().then(({ data }) => setDoc(data));
+      s.from("documents").select("*").eq("id", id).single().then(async ({ data }) => {
+        setDoc(data);
+        if (data?.kind === "quote") {
+          const rootId = data.amends_id || data.id;
+          const { data: av } = await s.from("documents").select("*").eq("amends_id", rootId).order("amendment_no");
+          setAmendments(av || []);
+          if (data.amends_id) { const { data: p } = await s.from("documents").select("*").eq("id", data.amends_id).single(); setParent(p); }
+        }
+      });
     }
   }, [id, isNew, params]);
 
@@ -97,6 +107,13 @@ function Editor() {
       signed_at: cur.signed_at || null, signer_name: cur.signer_name || null, signature_data: cur.signature_data || null, signer_photo: cur.signer_photo || null,
       paid_at: cur.paid_at || null, payment_method: cur.payment_method || null, number: cur.number || null,
     };
+    if (cur.amends_id && ["draft", "sent"].includes(cur.status)) {
+      const { data: p } = await s.from("documents").select("number, issue_date, signed_at, total_ttc").eq("id", cur.amends_id).single();
+      const { data: sib } = await s.from("documents").select("id, total_ttc, status, amendment_no").eq("amends_id", cur.amends_id);
+      const prev = (sib || []).filter((x: any) => x.id !== cur.id && ["signed", "invoiced"].includes(x.status) && (x.amendment_no || 0) < (cur.amendment_no || 0))
+        .reduce((a: number, x: any) => a + Number(x.total_ttc), 0);
+      if (p) payload.amend_meta = { parent_number: p.number, parent_date: p.issue_date, parent_signed_at: p.signed_at, base_ttc: Number(p.total_ttc), previous_ttc: prev };
+    }
     const locked = cur.id && cur.kind !== "quote" && doc!.status !== "draft";
     if (locked) {
       for (const k of Object.keys(payload)) if (!["status", "paid_at", "payment_method"].includes(k)) delete payload[k];
@@ -130,17 +147,40 @@ function Editor() {
     const saved = doc!.id ? doc! : await save();
     if (!saved) return;
     const s = sb();
+    const signedAv = saved.amends_id ? [] : amendments.filter((a) => a.status === "signed");
+    const bake = (lines: Line[], disc?: number) => lines.map((l) => ({ ...l, unit_price: Math.round(Number(l.unit_price) * (1 - (Number(disc) || 0) / 100) * 100) / 100 }));
+    const lines = signedAv.length
+      ? [...bake(saved.lines, saved.discount_pct), ...signedAv.flatMap((a) => bake(a.lines, a.discount_pct).map((l) => ({ ...l, label: `Avenant n° ${a.amendment_no} — ${l.label}` })))]
+      : saved.lines;
+    const t = computeTotals(lines, signedAv.length ? 0 : saved.discount_pct, company!.vat_exempt);
+    const refs = [`devis n° ${saved.number}${saved.signed_at ? ` accepté le ${dateFr(saved.signed_at)}` : ""}`,
+      ...signedAv.map((a) => `avenant n° ${a.amendment_no} (${a.number}) accepté le ${dateFr(a.signed_at)}`)];
     const { data, error } = await s.from("documents").insert({
       kind: "invoice", status: "draft", client_id: saved.client_id, client_snapshot: saved.client_snapshot,
-      title: saved.title, site_address: saved.site_address, lines: saved.lines, discount_pct: saved.discount_pct,
-      total_ht: saved.total_ht, total_vat: saved.total_vat, total_ttc: saved.total_ttc,
+      title: saved.title, site_address: saved.site_address, lines, discount_pct: signedAv.length ? 0 : saved.discount_pct,
+      total_ht: t.ht, total_vat: t.vat, total_ttc: t.ttc,
       issue_date: addDays(0), due_date: addDays(company!.payment_terms_days ?? 30),
-      notes: `Facture établie selon devis n° ${saved.number}${saved.signed_at ? ` accepté le ${dateFr(saved.signed_at)}` : ""}.`,
+      notes: `Facture établie selon ${refs.join(" et ")}.`,
       source_quote_id: saved.id,
     }).select().single();
     if (error) return setErr(error.message);
-    await s.from("documents").update({ status: "invoiced" }).eq("id", saved.id);
+    await s.from("documents").update({ status: "invoiced" }).in("id", [saved.id, ...signedAv.map((a) => a.id)]);
     router.push(`/app/doc/${data.id}`);
+  }
+
+  async function createAmendment() {
+    const root = parent || doc!;
+    const n = Math.max(0, ...amendments.map((a) => a.amendment_no || 0)) + 1;
+    const prev = amendments.filter((a) => ["signed", "invoiced"].includes(a.status)).reduce((x, a) => x + Number(a.total_ttc), 0);
+    const { data, error } = await sb().from("documents").insert({
+      kind: "quote", status: "draft", amends_id: root.id, amendment_no: n, number: `${root.number}-AV${n}`,
+      client_id: root.client_id, client_snapshot: root.client_snapshot, site_address: root.site_address,
+      title: `Avenant n° ${n} au devis ${root.number}${root.title ? ` — ${root.title}` : ""}`,
+      issue_date: addDays(0), valid_until: addDays(company!.quote_validity_days ?? 30), lines: [],
+      amend_meta: { parent_number: root.number, parent_date: root.issue_date, parent_signed_at: root.signed_at, base_ttc: Number(root.total_ttc), previous_ttc: prev },
+    }).select().single();
+    if (error) return setErr(error.message);
+    location.href = `/app/doc/${data.id}`;
   }
 
   async function depositInvoice() {
@@ -227,7 +267,7 @@ function Editor() {
     setBusy(false);
   }
 
-  const title = doc.kind === "quote" ? "Devis" : doc.kind === "credit" ? "Avoir" : "Facture";
+  const title = doc.amends_id ? `Avenant ${doc.amendment_no}` : doc.kind === "quote" ? "Devis" : doc.kind === "credit" ? "Avoir" : "Facture";
   const relance = () => {
     const body = `Bonjour,\n\nSauf erreur de notre part, la facture ${doc.number} du ${dateFr(doc.issue_date)} d'un montant de ${eur(doc.total_ttc)} arrivée à échéance le ${dateFr(doc.due_date)} reste impayée.\n\nMerci de procéder au règlement${company.iban ? ` par virement (IBAN ${company.iban})` : ""}.\n\nCordialement,\n${company.name}`;
     location.href = `mailto:${client?.email || doc.client_snapshot?.email || ""}?subject=${encodeURIComponent(`Relance facture ${doc.number}`)}&body=${encodeURIComponent(body)}`;
@@ -241,6 +281,28 @@ function Editor() {
         {err && <p onClick={() => setErr("")} className="fixed inset-x-4 top-4 z-50 rounded-xl bg-red-600 p-3 text-center text-sm font-semibold text-white shadow-lg">⚠️ {err}<span className="block text-xs font-normal opacity-80">Appuyez pour fermer</span></p>}
         {toast && <p className="fixed inset-x-4 top-4 z-50 rounded-xl bg-ink p-3 text-center text-sm font-semibold text-white shadow-lg">{toast}</p>}
 
+        {doc.amends_id && (
+          <Link href={`/app/doc/${doc.amends_id}`} className="card block border-orange-200 bg-flame-light text-sm">
+            📎 Avenant n° {doc.amendment_no} au devis <b>{doc.amend_meta?.parent_number || parent?.number}</b>
+            {doc.amend_meta?.base_ttc != null && <> · devis initial {eur(doc.amend_meta.base_ttc)} TTC{doc.amend_meta.previous_ttc ? ` + avenants ${eur(doc.amend_meta.previous_ttc)}` : ""}</>}
+            <span className="block text-xs text-slate-600">Ajoutez seulement les changements : une quantité négative retire une prestation du devis initial.</span>
+          </Link>
+        )}
+        {isQuote && !doc.amends_id && amendments.length > 0 && (
+          <section className="card space-y-2">
+            <h2 className="font-bold">Avenants</h2>
+            {amendments.map((a) => (
+              <Link key={a.id} href={`/app/doc/${a.id}`} className="flex items-center justify-between gap-2 border-t border-slate-100 pt-2 text-sm">
+                <span>N° {a.amendment_no} · {a.number}</span>
+                <span className="flex items-center gap-2"><b>{eur(a.total_ttc)}</b><span className={`chip ${STATUS_COLOR[a.status]}`}>{STATUS_LABEL[a.status]}</span></span>
+              </Link>
+            ))}
+            <div className="flex justify-between border-t pt-2 text-sm font-bold">
+              <span>Total du marché (devis + avenants signés)</span>
+              <span>{eur(Number(doc.total_ttc) + amendments.filter((a) => ["signed", "invoiced"].includes(a.status)).reduce((x, a) => x + Number(a.total_ttc), 0))}</span>
+            </div>
+          </section>
+        )}
         {/* Client */}
         <section className="card space-y-3">
           <div className="flex items-center justify-between">
@@ -408,7 +470,8 @@ function Editor() {
           {doc.id && isQuote && <button className="btn-ghost w-full" onClick={duplicate}>Dupliquer</button>}
           {doc.id && isQuote && editable && <button className="btn-ghost w-full" onClick={() => save({ status: "refused" })}>Marquer refusé</button>}
           {doc.id && doc.status === "draft" && <button className="btn-danger w-full" onClick={remove}>Supprimer le brouillon</button>}
-          {doc.id && isQuote && ["signed", "invoiced"].includes(doc.status) && <Link href={`/app/chantiers/nouveau?doc=${doc.id}`} className="btn-ghost w-full">🏗️ Ouvrir le suivi de chantier</Link>}
+          {doc.id && isQuote && ["signed", "invoiced"].includes(doc.status) && <button className="btn-brand w-full" onClick={createAmendment}>➕ Créer un avenant (travaux en plus ou en moins)</button>}
+          {doc.id && isQuote && !doc.amends_id && ["signed", "invoiced"].includes(doc.status) && <Link href={`/app/chantiers/nouveau?doc=${doc.id}`} className="btn-ghost w-full">🏗️ Ouvrir le suivi de chantier</Link>}
           {doc.id && doc.client_id && <Link href={`/app/planning?doc=${doc.id}&client=${doc.client_id}`} className="btn-ghost w-full">🗓 Planifier l'intervention</Link>}
         </section>
       </div>

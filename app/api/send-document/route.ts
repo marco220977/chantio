@@ -30,14 +30,14 @@ export async function POST(req: Request) {
   if (doc.kind !== "quote" && doc.status === "draft") return NextResponse.json({ error: "Émettez la facture avant de l'envoyer." }, { status: 400 });
 
   const isQuote = doc.kind === "quote";
-  const label = isQuote ? "devis" : doc.kind === "credit" ? "avoir" : "facture";
+  const label = doc.amends_id ? "avenant" : isQuote ? "devis" : doc.kind === "credit" ? "avoir" : "facture";
   const signUrl = `${process.env.NEXT_PUBLIC_APP_URL || origin}/signer/${doc.public_token}`;
   const name = doc.client_snapshot?.name || "";
 
   const body = isQuote
     ? `<p>Bonjour ${esc(name)},</p>
-       <p>Veuillez trouver ci-joint notre devis n° <b>${esc(doc.number)}</b>${doc.title ? ` — ${esc(doc.title)}` : ""}, d'un montant de <b>${eur(doc.total_ttc)} TTC</b>${doc.valid_until ? `, valable jusqu'au ${dfr(doc.valid_until)}` : ""}.</p>
-       ${["draft", "sent"].includes(doc.status) ? `<p style="margin:24px 0"><a href="${signUrl}" style="background:#ea7a0c;color:#fff;padding:14px 22px;border-radius:10px;text-decoration:none;font-weight:bold">Consulter et signer le devis</a></p>` : ""}`
+       <p>Veuillez trouver ci-joint ${doc.amends_id ? `l'avenant n° ${doc.amendment_no} à notre devis ${esc(doc.amend_meta?.parent_number || "")}, référence` : "notre devis"} n° <b>${esc(doc.number)}</b>${doc.title ? ` — ${esc(doc.title)}` : ""}, d'un montant de <b>${eur(doc.total_ttc)} TTC</b>${doc.valid_until ? `, valable jusqu'au ${dfr(doc.valid_until)}` : ""}.</p>
+       ${["draft", "sent"].includes(doc.status) ? `<p style="margin:24px 0"><a href="${signUrl}" style="background:#ea7a0c;color:#fff;padding:14px 22px;border-radius:10px;text-decoration:none;font-weight:bold">Consulter et signer ${doc.amends_id ? "l'avenant" : "le devis"}</a></p>` : ""}`
     : `<p>Bonjour ${esc(name)},</p>
        <p>Veuillez trouver ci-joint notre ${label} n° <b>${esc(doc.number)}</b> du ${dfr(doc.issue_date)}, d'un montant de <b>${eur(doc.total_ttc)} TTC</b>${doc.kind === "invoice" && doc.due_date ? `, à régler avant le ${dfr(doc.due_date)}` : ""}.</p>
        ${doc.kind === "invoice" && co.iban ? `<p>Règlement par virement : IBAN ${esc(co.iban)}${co.bic ? ` — BIC ${esc(co.bic)}` : ""}</p>` : ""}`;

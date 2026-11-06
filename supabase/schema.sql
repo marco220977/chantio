@@ -374,3 +374,6 @@ create policy chantiers_delete on storage.objects for delete to authenticated us
 
 -- ---------- V1.11 : vérification SIRET ----------
 -- companies.siret_verified_at, companies.naf, clients.siret_verified_at, fonction siret_in_use()
+
+-- ---------- V1.12 : avenants et suivi d'ouverture ----------
+-- documents.amends_id / amendment_no / amend_meta ; documents.viewed_at / last_viewed_at / view_count ; mark_quote_viewed()

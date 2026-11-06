@@ -23,7 +23,8 @@ export async function buildPdf(doc: Doc, company: Company): Promise<jsPDF> {
   const pdf = new jsPDF({ unit: "mm", format: "a4" });
   const W = 210, M = 15;
   const isQuote = doc.kind === "quote";
-  const title = isQuote ? "DEVIS" : doc.kind === "credit" ? "AVOIR" : "FACTURE";
+  const isAvenant = isQuote && !!doc.amends_id;
+  const title = isAvenant ? `AVENANT N° ${doc.amendment_no || ""}` : isQuote ? "DEVIS" : doc.kind === "credit" ? "AVOIR" : "FACTURE";
   const c = doc.client_snapshot || {};
   let y = M;
 
@@ -101,6 +102,26 @@ export async function buildPdf(doc: Doc, company: Company): Promise<jsPDF> {
   });
   y += rows.length * 6 + 4;
 
+  // Récapitulatif du marché (avenant)
+  if (isAvenant && doc.amend_meta) {
+    const m = doc.amend_meta;
+    const base = Number(m.base_ttc) || 0, prev = Number(m.previous_ttc) || 0;
+    const recap: [string, string][] = [
+      [`Devis initial n° ${m.parent_number}${m.parent_signed_at ? ` (accepté le ${dateFr(m.parent_signed_at)})` : ""}`, money(base)],
+      ...(prev ? [["Avenants précédents signés", money(prev)] as [string, string]] : []),
+      [`Présent avenant n° ${doc.amendment_no}`, money(t.ttc)],
+      ["Nouveau montant total du marché TTC", money(base + prev + t.ttc)],
+    ];
+    if (y + recap.length * 5.5 + 8 > 275) { pdf.addPage(); y = M; }
+    pdf.setDrawColor(220).setFillColor(255, 247, 237).roundedRect(M, y - 4, W - 2 * M, recap.length * 5.5 + 5, 2, 2, "FD");
+    recap.forEach(([k, v], i) => {
+      const last = i === recap.length - 1;
+      pdf.setFont("helvetica", last ? "bold" : "normal").setFontSize(9);
+      pdf.text(k, M + 3, y + i * 5.5); pdf.text(v, W - M - 3, y + i * 5.5, { align: "right" });
+    });
+    y += recap.length * 5.5 + 6;
+  }
+
   // Mentions légales
   const mentions: string[] = [];
   if (exempt) mentions.push("TVA non applicable, art. 293 B du CGI.");
@@ -108,7 +129,8 @@ export async function buildPdf(doc: Doc, company: Company): Promise<jsPDF> {
   if (reduced) mentions.push("Taux réduit de TVA appliqué : le client certifie que les travaux portent sur un local à usage d'habitation achevé depuis plus de deux ans (art. 278-0 bis A et 279-0 bis du CGI).");
   if (company.insurance) mentions.push(`Assurance décennale : ${company.insurance}.`);
   if (isQuote) {
-    mentions.push("Devis gratuit. Pour accepter ce devis, retournez-le signé avec la mention « Bon pour accord ».");
+    if (isAvenant) mentions.push(`Le présent avenant modifie le devis n° ${doc.amend_meta?.parent_number || ""}${doc.amend_meta?.parent_date ? ` du ${dateFr(doc.amend_meta.parent_date)}` : ""}. Les quantités négatives correspondent à des prestations supprimées. Toutes les autres clauses et conditions du devis initial restent inchangées. Pour accepter cet avenant, retournez-le signé avec la mention « Bon pour accord ».`);
+    else mentions.push("Devis gratuit. Pour accepter ce devis, retournez-le signé avec la mention « Bon pour accord ».");
   } else {
     mentions.push(`Paiement à ${company.payment_terms_days ?? 30} jours. Pas d'escompte pour paiement anticipé.`);
     mentions.push(`Pénalités de retard : ${company.late_penalty_rate || "3 fois le taux d'intérêt légal"}. Indemnité forfaitaire pour frais de recouvrement (clients professionnels) : 40 €.`);

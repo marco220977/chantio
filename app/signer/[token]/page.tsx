@@ -41,7 +41,7 @@ export default function Signer() {
         <div><p className="font-extrabold">{company.name}</p><p className="text-xs text-slate-500">{[company.phone, company.email].filter(Boolean).join(" · ")}</p></div>
       </header>
       <div className="card">
-        <p className="label">Devis n° {doc.number} · {dateFr(doc.issue_date)}</p>
+        <p className="label">{doc.amends_id ? `Avenant n° ${doc.amendment_no} au devis ${doc.amend_meta?.parent_number || ""} · ` : "Devis "}n° {doc.number} · {dateFr(doc.issue_date)}</p>
         <h1 className="text-xl font-extrabold">{doc.title || "Devis"}</h1>
         <p className="text-sm text-slate-500">Pour {doc.client_snapshot?.name}{doc.site_address ? ` — ${doc.site_address}` : ""}</p>
         {doc.valid_until && <p className="text-xs text-slate-500">Valable jusqu'au {dateFr(doc.valid_until)}</p>}
@@ -58,7 +58,7 @@ export default function Signer() {
         <div className="flex justify-between text-xl font-extrabold"><span>Total TTC</span><span>{eur(t.ttc)}</span></div>
         {!!doc.deposit_pct && <p className="text-sm text-slate-600">Acompte à la commande : {eur((t.ttc * Number(doc.deposit_pct)) / 100)} ({doc.deposit_pct} %)</p>}
       </div>
-      <h2 className="pt-2 font-bold">Le devis complet</h2>
+      <h2 className="pt-2 font-bold">{doc.amends_id ? "L'avenant complet" : "Le devis complet"}</h2>
       <PdfPreview inline build={build} filename={`Devis-${doc.number}.pdf`} />
 
       {doc.signed_at ? (

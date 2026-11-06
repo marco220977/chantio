@@ -35,4 +35,6 @@ export type Doc = {
   total_ttc?: number; notes?: string; public_token?: string; signed_at?: string;
   signer_name?: string; signature_data?: string; signer_photo?: string | null; source_quote_id?: string;
   paid_at?: string; payment_method?: string; created_at?: string; sent_at?: string; sent_to?: string;
+  amends_id?: string | null; amendment_no?: number | null;
+  amend_meta?: { parent_number?: string; parent_date?: string; parent_signed_at?: string; base_ttc?: number; previous_ttc?: number } | null;
 };
