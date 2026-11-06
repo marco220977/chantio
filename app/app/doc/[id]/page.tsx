@@ -1,5 +1,6 @@
 "use client";
 import { isOffline, queueDoc } from "@/lib/offline";
+import AiQuote from "@/components/AiQuote";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -36,6 +37,7 @@ function Editor() {
   const [doc, setDoc] = useState<Doc | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
+  const [ai, setAi] = useState(false);
   const [preview, setPreview] = useState<null | (() => Promise<any>)>(null);
   const [modal, setModal] = useState<"" | "catalog" | "client" | "sign" | "send" | "pay">("");
   const [busy, setBusy] = useState(false);
@@ -453,6 +455,7 @@ function Editor() {
             <div className="grid grid-cols-2 gap-2">
               <button className="btn-ghost" onClick={() => setModal("catalog")}>📚 Catalogue</button>
               <button className="btn-ghost" onClick={() => set({ lines: [...doc.lines, emptyLine()] })}>＋ Ligne libre</button>
+              {isQuote && <button className="btn-brand col-span-2" onClick={() => setAi(true)}>✨ Devis par IA (dictée ou texte)</button>}
             </div>
           )}
         </section>
@@ -596,6 +599,8 @@ function Editor() {
 
       {/* Modales */}
       {preview && <PdfPreview build={preview} filename={`${doc.number || "brouillon"}.pdf`} onClose={() => setPreview(null)} />}
+      {ai && doc && <AiQuote catalog={catalog} vat={company?.vat_exempt ? 0 : 10} onClose={() => setAi(false)}
+        onApply={(r) => { setAi(false); set({ lines: [...doc.lines.filter((l) => l.label || Number(l.unit_price)), ...r.lines], title: doc.title || r.title || "" }); }} />}
       {modal === "catalog" && (
         <Modal title="Catalogue" onClose={() => setModal("")}>
           <input className="input mb-3" placeholder="Rechercher (prestation, article, référence fournisseur)…" value={catQ} onChange={(e) => setCatQ(e.target.value)} />
