@@ -133,7 +133,7 @@ function Settings() {
                   address: i.address || c.address, zip: i.zip || c.zip, city: i.city || c.city,
                   vat_number: c.vat_exempt ? c.vat_number : c.vat_number || i.vat_number } : {}) });
             }} />
-          {c.siret_verified_at && <p className="-mt-2 text-xs text-green-700">✔ SIRET vérifié le {new Date(c.siret_verified_at).toLocaleDateString("fr-FR")} — pensez à enregistrer</p>}
+          {c.siret_verified_at && <p className="-mt-2 text-xs text-green-700">✔ SIRET vérifié le {new Date(c.siret_verified_at).toLocaleDateString("fr-FR")}{c.siret_verified_at !== company.siret_verified_at ? " — appuyez sur Enregistrer" : ""}</p>}
           {F({ k: "rcs", label: "RCS / RM", ph: "ex. RM 123 456 789 Créteil" })}
           {F({ k: "vat_number", label: "N° TVA intracommunautaire", ph: "FR..." })}
           <label className="flex items-center gap-2 text-sm">
@@ -159,7 +159,7 @@ function Settings() {
           {F({ k: "footer_note", label: "Mention pied de page (optionnel)" })}
         </section>
         <button className="btn-primary sticky bottom-24 w-full py-3.5 shadow-lg" onClick={save}>Enregistrer</button>
-        {msg && <p className="text-center text-sm">{msg}</p>}
+        {msg && <p className="fixed inset-x-4 top-4 z-50 rounded-xl bg-ink p-3 text-center text-sm font-semibold text-white shadow-lg">{msg}</p>}
         <NumberingSection />
         <section className="card space-y-3">
           <h2 className="font-bold">Mot de passe</h2>
