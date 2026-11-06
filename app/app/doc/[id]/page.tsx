@@ -143,6 +143,8 @@ function Editor() {
     const { data: num, error } = await sb().rpc("next_number", { p_kind: doc!.kind === "credit" ? "A" : "F" });
     if (error) return setErr(error.message);
     const issued = await save({ number: num as string, status: "issued", issue_date: addDays(0) });
+    // l'avoir émis annule la facture d'origine
+    if (issued && issued.kind === "credit" && issued.source_quote_id) await sb().from("documents").update({ status: "canceled" }).eq("id", issued.source_quote_id).eq("kind", "invoice");
     const co: any = company;
     const ownAuto = co?.einvoice_mode === "own" && co?.own_pa_auto && co?.own_pa_email && channelOf(issued as Doc) === "b2b";
     if (issued && co?.einvoice_enabled && (co?.einvoice_mode !== "own" || ownAuto)) {
@@ -219,7 +221,7 @@ function Editor() {
   }
 
   async function creditNote() {
-    if (!confirm("Créer un avoir qui annule totalement cette facture ?")) return;
+    if (!confirm("Créer un avoir qui annule totalement cette facture ? Il sera en brouillon : la facture sera annulée quand vous émettrez l'avoir.")) return;
     const s = sb();
     const { data, error } = await s.from("documents").insert({
       kind: "credit", status: "draft", client_id: doc!.client_id, client_snapshot: doc!.client_snapshot,
@@ -230,7 +232,6 @@ function Editor() {
       source_quote_id: doc!.id,
     }).select().single();
     if (error) return setErr(error.message);
-    await s.from("documents").update({ status: "canceled" }).eq("id", doc!.id);
     router.push(`/app/doc/${data.id}`);
   }
 
