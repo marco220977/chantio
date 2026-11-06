@@ -5,6 +5,7 @@ import Link from "next/link";
 import { sb } from "@/lib/supabase";
 import { useCompany } from "@/components/CompanyContext";
 import Header from "@/components/Header";
+import NumberingSection from "@/components/NumberingSection";
 import type { Company } from "@/lib/types";
 
 function Settings() {
@@ -106,7 +107,7 @@ function Settings() {
     <>
       <Header back title="Mon entreprise" />
       <div className="space-y-4 p-4">
-        {welcome && <p className="card bg-flame-light text-sm">Bienvenue ! Renseignez vos informations : elles apparaîtront sur vos devis et factures.</p>}
+        {welcome && <p className="card bg-flame-light text-sm">Bienvenue ! Renseignez vos informations : elles apparaîtront sur vos devis et factures. Vous changez de logiciel ? Réglez la suite de vos numéros dans « Numérotation », plus bas, avant votre première facture.</p>}
         <section className="card space-y-3">
           <h2 className="font-bold">Identité</h2>
           {me && <div><label className="label">Votre nom (affiché à l'équipe)</label><div className="flex gap-2"><input className="input" value={myName} onChange={(e) => setMyName(e.target.value)} /><button className="btn-ghost" onClick={async () => { await sb().rpc("update_my_name", { p_name: myName }); reload(); }}>OK</button></div></div>}
@@ -149,6 +150,7 @@ function Settings() {
         </section>
         <button className="btn-primary sticky bottom-24 w-full py-3.5 shadow-lg" onClick={save}>Enregistrer</button>
         {msg && <p className="text-center text-sm">{msg}</p>}
+        <NumberingSection />
         <section className="card space-y-3">
           <h2 className="font-bold">Mot de passe</h2>
           <input className="input" type="password" placeholder="Nouveau mot de passe" value={pwd} onChange={(e) => setPwd(e.target.value)} />

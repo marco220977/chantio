@@ -367,3 +367,7 @@ create policy chantiers_delete on storage.objects for delete to authenticated us
 -- ---------- V1.9 : tarifs fournisseurs ----------
 -- voir migration "supplier_catalogs" : catalog_items.supplier/ref/brand/public_price/import_id,
 -- contrainte unique (company_id, supplier, ref), table suppliers, apply_supplier_coef()
+
+-- ---------- V1.10 : numérotation personnalisable ----------
+-- voir migration "numbering_settings" : table numbering_settings, format_number(), next_number() avec préfixe,
+-- get_numbering(), set_numbering() (verrouillé pour factures/avoirs après la première émission)
