@@ -6,6 +6,7 @@ import { sb } from "@/lib/supabase";
 import { addDays, dateFr } from "@/lib/calc";
 import { useCompany } from "@/components/CompanyContext";
 import Header from "@/components/Header";
+import PdfPreview from "@/components/PdfPreview";
 import Modal from "@/components/Modal";
 import SignaturePad from "@/components/SignaturePad";
 import EquipmentForm from "@/components/EquipmentForm";
@@ -23,6 +24,7 @@ function Visit() {
   const isNew = id === "nouveau";
   const [r, setR] = useState<Report | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
+  const [preview, setPreview] = useState<null | (() => Promise<any>)>(null);
   const [modal, setModal] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -220,7 +222,7 @@ function Visit() {
           {editable && r.id && <button className="btn-ghost w-full" onClick={async () => { const e = check(); if (e) return setErr(e); if (confirm("Valider sans signature du client ?")) await validate({}); }}>Valider sans signature</button>}
           {r.id && (
             <div className="grid grid-cols-2 gap-2">
-              <button className="btn-ghost" onClick={async () => (await buildReportPdf(r, company)).save(`${r.number}.pdf`)}>⬇️ PDF</button>
+              <button className="btn-ghost" onClick={() => setPreview(() => () => buildReportPdf(r, company))}>👁 Aperçu</button>
               <button className="btn-ghost" onClick={async () => shareOrSave(await buildReportPdf(r, company), `${r.number}.pdf`)}>📤 Partager</button>
             </div>
           )}
@@ -230,6 +232,7 @@ function Visit() {
         </section>
       </div>
 
+      {preview && <PdfPreview build={preview} filename={`${r.number || "attestation"}.pdf`} onClose={() => setPreview(null)} />}
       {modal === "sign" && (
         <Modal title="Signature du client" onClose={() => setModal("")}>
           <SignaturePad defaultName={client?.name || r.client_snapshot?.name || ""} allowPhoto={false} onCancel={() => setModal("")}

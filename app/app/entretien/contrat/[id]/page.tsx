@@ -7,6 +7,7 @@ import { sb } from "@/lib/supabase";
 import { addDays, dateFr, eur, VAT_RATES } from "@/lib/calc";
 import { useCompany } from "@/components/CompanyContext";
 import Header from "@/components/Header";
+import PdfPreview from "@/components/PdfPreview";
 import Modal from "@/components/Modal";
 import SignaturePad from "@/components/SignaturePad";
 import EquipmentForm from "@/components/EquipmentForm";
@@ -30,6 +31,7 @@ function Editor() {
   const isNew = id === "nouveau";
   const [c, setC] = useState<Contract | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
+  const [preview, setPreview] = useState<null | (() => Promise<any>)>(null);
   const [modal, setModal] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -198,7 +200,7 @@ function Editor() {
           {editable && c.id && <button className="btn-brand w-full py-3.5" onClick={async () => { if (!c.equipment.type) return setErr("Choisissez le type d'équipement."); if (!c.client_id) return setErr("Choisissez un client."); if (await save()) setModal("sign"); }}>✍️ Faire signer le contrat</button>}
           {c.id && (
             <div className="grid grid-cols-2 gap-2">
-              <button className="btn-ghost" onClick={async () => (await pdf()).save(`${c.number}.pdf`)}>⬇️ PDF</button>
+              <button className="btn-ghost" onClick={() => setPreview(() => () => buildContractPdf(c, company))}>👁 Aperçu</button>
               <button className="btn-ghost" onClick={async () => shareOrSave(await pdf(), `${c.number}.pdf`)}>📤 Partager</button>
             </div>
           )}
@@ -220,6 +222,7 @@ function Editor() {
         </section>
       </div>
 
+      {preview && <PdfPreview build={preview} filename={`${c.number || "contrat"}.pdf`} onClose={() => setPreview(null)} />}
       {modal === "sign" && (
         <Modal title={`Contrat — ${eur(ttc)} TTC/an`} onClose={() => setModal("")}>
           <SignaturePad defaultName={client?.name || ""} onCancel={() => setModal("")}

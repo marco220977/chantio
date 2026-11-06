@@ -4,9 +4,10 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { sb } from "@/lib/supabase";
 import { addDays, computeTotals, dateFr, eur, STATUS_COLOR, STATUS_LABEL, VAT_RATES } from "@/lib/calc";
-import { downloadPdf, pdfBase64, sharePdf } from "@/lib/pdf";
+import { buildPdf, pdfBase64, sharePdf } from "@/lib/pdf";
 import { useCompany } from "@/components/CompanyContext";
 import Header from "@/components/Header";
+import PdfPreview from "@/components/PdfPreview";
 import Modal from "@/components/Modal";
 import SignaturePad from "@/components/SignaturePad";
 import SiretField from "@/components/SiretField";
@@ -24,6 +25,7 @@ function Editor() {
   const [doc, setDoc] = useState<Doc | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
+  const [preview, setPreview] = useState<null | (() => Promise<any>)>(null);
   const [modal, setModal] = useState<"" | "catalog" | "client" | "sign" | "send" | "pay">("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -365,10 +367,11 @@ function Editor() {
         {/* Actions */}
         <section className="space-y-2">
           {editable && <button className="btn-primary w-full py-3.5" disabled={busy} onClick={() => save()}>{busy ? "Enregistrement…" : "💾 Enregistrer"}</button>}
+          {!doc.id && doc.lines.length > 0 && <button className="btn-ghost w-full" onClick={() => setPreview(() => () => buildPdf({ ...doc, client_snapshot: client ? { ...client } : doc.client_snapshot }, company))}>👁 Aperçu du PDF</button>}
 
           {doc.id && (
             <div className="grid grid-cols-2 gap-2">
-              <button className="btn-ghost" onClick={() => downloadPdf(doc, company)}>⬇️ PDF</button>
+              <button className="btn-ghost" onClick={() => setPreview(() => () => buildPdf({ ...doc, client_snapshot: client ? { ...client } : doc.client_snapshot }, company))}>👁 Aperçu</button>
               <button className="btn-ghost" onClick={() => sharePdf(doc, company)}>📤 Partager PDF</button>
             </div>
           )}
@@ -409,6 +412,7 @@ function Editor() {
       </div>
 
       {/* Modales */}
+      {preview && <PdfPreview build={preview} filename={`${doc.number || "brouillon"}.pdf`} onClose={() => setPreview(null)} />}
       {modal === "catalog" && (
         <Modal title="Catalogue" onClose={() => setModal("")}>
           <input className="input mb-3" placeholder="Rechercher (prestation, article, référence fournisseur)…" value={catQ} onChange={(e) => setCatQ(e.target.value)} />

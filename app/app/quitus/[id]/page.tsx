@@ -6,6 +6,7 @@ import { sb } from "@/lib/supabase";
 import { addDays, dateFr } from "@/lib/calc";
 import { useCompany } from "@/components/CompanyContext";
 import Header from "@/components/Header";
+import PdfPreview from "@/components/PdfPreview";
 import Modal from "@/components/Modal";
 import SignaturePad from "@/components/SignaturePad";
 import { buildReceptionPdf, type Reception } from "@/lib/quitus-sav";
@@ -21,6 +22,7 @@ function Editor() {
   const isNew = id === "nouveau";
   const [r, setR] = useState<Reception | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
+  const [preview, setPreview] = useState<null | (() => Promise<any>)>(null);
   const [modal, setModal] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -183,7 +185,7 @@ function Editor() {
           }}>✍️ Faire signer le quitus</button>}
           {r.id && (
             <div className="grid grid-cols-2 gap-2">
-              <button className="btn-ghost" onClick={async () => (await buildReceptionPdf(r, company)).save(`${r.number}.pdf`)}>⬇️ PDF</button>
+              <button className="btn-ghost" onClick={() => setPreview(() => () => buildReceptionPdf(r, company))}>👁 Aperçu</button>
               <button className="btn-ghost" onClick={async () => shareOrSave(await buildReceptionPdf(r, company), `${r.number}.pdf`)}>📤 Partager</button>
             </div>
           )}
@@ -193,6 +195,7 @@ function Editor() {
         </section>
       </div>
 
+      {preview && <PdfPreview build={preview} filename={`${r.number || "quitus"}.pdf`} onClose={() => setPreview(null)} />}
       {modal === "sign" && (
         <Modal title="Signature du client" onClose={() => setModal("")}>
           <SignaturePad defaultName={client?.name || r.client_snapshot?.name || ""} onCancel={() => setModal("")}

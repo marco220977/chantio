@@ -6,6 +6,7 @@ import { sb } from "@/lib/supabase";
 import { addDays, dateFr } from "@/lib/calc";
 import { memberName, useCompany } from "@/components/CompanyContext";
 import Header from "@/components/Header";
+import PdfPreview from "@/components/PdfPreview";
 import Modal from "@/components/Modal";
 import SignaturePad from "@/components/SignaturePad";
 import EquipmentForm from "@/components/EquipmentForm";
@@ -28,6 +29,7 @@ function Editor() {
   const [clients, setClients] = useState<Client[]>([]);
   const [contracts, setContracts] = useState<any[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
+  const [preview, setPreview] = useState<null | (() => Promise<any>)>(null);
   const [modal, setModal] = useState("");
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
@@ -248,7 +250,7 @@ function Editor() {
           )}
           {t.id && (
             <div className="grid grid-cols-2 gap-2">
-              <button className="btn-ghost" onClick={async () => (await buildSavPdf(t, company, urls)).save(`${t.number}.pdf`)}>⬇️ Bon PDF</button>
+              <button className="btn-ghost" onClick={() => setPreview(() => () => buildSavPdf(t, company, urls))}>👁 Aperçu</button>
               <button className="btn-ghost" onClick={async () => shareOrSave(await buildSavPdf(t, company, urls), `${t.number}.pdf`)}>📤 Partager</button>
             </div>
           )}
@@ -262,6 +264,7 @@ function Editor() {
         </section>
       </div>
 
+      {preview && <PdfPreview build={preview} filename={`${t.number || "sav"}.pdf`} onClose={() => setPreview(null)} />}
       {modal === "sign" && (
         <Modal title="Fin d'intervention" onClose={() => setModal("")}>
           <SignaturePad defaultName={client?.name || t.client_snapshot?.name || ""} allowPhoto={false} onCancel={() => setModal("")}
