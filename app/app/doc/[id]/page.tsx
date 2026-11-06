@@ -28,6 +28,17 @@ function Editor() {
   const [err, setErr] = useState("");
   const [catQ, setCatQ] = useState("");
   const [catCat, setCatCat] = useState("all");
+  const [supRes, setSupRes] = useState<CatalogItem[]>([]);
+  useEffect(() => {
+    if (modal !== "catalog" || catQ.trim().length < 2) { setSupRes([]); return; }
+    const t = setTimeout(async () => {
+      let qy = sb().from("catalog_items").select("*").not("supplier", "is", null);
+      for (const w of catQ.trim().split(/\s+/)) qy = qy.or(`label.ilike.%${w.replace(/[%,()]/g, "")}%,ref.ilike.%${w.replace(/[%,()]/g, "")}%`);
+      const { data } = await qy.order("label").limit(30);
+      setSupRes(data || []);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [catQ, modal]);
   const [newClient, setNewClient] = useState<Partial<Client>>({ type: "particulier" });
   const [toast, setToast] = useState("");
   const [showMargin, setShowMargin] = useState(false);
@@ -35,7 +46,7 @@ function Editor() {
   useEffect(() => {
     const s = sb();
     s.from("clients").select("*").order("name").then(({ data }) => setClients(data || []));
-    s.from("catalog_items").select("*").order("category").order("label").then(({ data }) => setCatalog(data || []));
+    s.from("catalog_items").select("*").is("supplier", null).order("category").order("label").then(({ data }) => setCatalog(data || []));
     if (isNew) {
       const kind = (params.get("kind") as Doc["kind"]) || "quote";
       let dup: Partial<Doc> = {};
@@ -399,7 +410,22 @@ function Editor() {
       {/* Modales */}
       {modal === "catalog" && (
         <Modal title="Catalogue" onClose={() => setModal("")}>
-          <input className="input mb-3" placeholder="Rechercher…" value={catQ} onChange={(e) => setCatQ(e.target.value)} />
+          <input className="input mb-3" placeholder="Rechercher (prestation, article, référence fournisseur)…" value={catQ} onChange={(e) => setCatQ(e.target.value)} />
+          {supRes.length > 0 && (
+            <div className="mb-3 space-y-2">
+              <p className="label">Tarifs fournisseurs</p>
+              {supRes.map((c: any) => (
+                <button key={c.id} className="card w-full text-left" onClick={() => {
+                  set({ lines: [...doc.lines, { label: c.label, description: c.description, qty: 1, unit: c.unit, unit_price: Number(c.unit_price), vat_rate: Number(c.vat_rate), cost_price: Number(c.cost_price) || 0 }] });
+                  setModal("");
+                }}>
+                  <p className="text-xs text-slate-400">🏭 {c.supplier} · {c.ref}</p>
+                  <div className="flex justify-between gap-2"><span className="font-semibold">{c.label}</span><span className="whitespace-nowrap">{eur(c.unit_price)}</span></div>
+                </button>
+              ))}
+              <p className="label pt-2">Mes prestations</p>
+            </div>
+          )}
           {catalog.length === 0 && (
             <button className="btn-primary w-full" onClick={async () => { await sb().rpc("complete_my_catalog"); const { data } = await sb().from("catalog_items").select("*").order("category").order("label"); setCatalog(data || []); }}>
               📚 Charger le catalogue type

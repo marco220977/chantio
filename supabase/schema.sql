@@ -363,3 +363,7 @@ create policy chantiers_delete on storage.objects for delete to authenticated us
 -- handle_new_user() avec jeton d'invitation, set_member_role(), remove_member(), update_my_name(),
 -- assigned_to (interventions, sav_tickets, maintenance_reports), chantiers.team, RLS par rôle,
 -- trigger report_done_update_contract
+
+-- ---------- V1.9 : tarifs fournisseurs ----------
+-- voir migration "supplier_catalogs" : catalog_items.supplier/ref/brand/public_price/import_id,
+-- contrainte unique (company_id, supplier, ref), table suppliers, apply_supplier_coef()
