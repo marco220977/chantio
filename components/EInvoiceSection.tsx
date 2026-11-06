@@ -5,6 +5,7 @@ import { buildFacturX, channelOf, EINV_STATUS, validateEInvoice } from "@/lib/ei
 import { callEInvoice } from "@/lib/einvoice-client";
 import type { Company, Doc } from "@/lib/types";
 import Link from "next/link";
+import { pdfBase64 as makePdf, buildPdf } from "@/lib/pdf";
 
 export default function EInvoiceSection({ doc, company, onDoc }: { doc: Doc; company: Company; onDoc: (d: Doc) => void }) {
   const [events, setEvents] = useState<any[]>([]);
@@ -14,15 +15,35 @@ export default function EInvoiceSection({ doc, company, onDoc }: { doc: Doc; com
   const channel = channelOf(doc);
   const errors = validateEInvoice(doc, company);
   const enabled = !!(company as any).einvoice_enabled;
+  const own = (company as any).einvoice_mode === "own";
+  const paName = (company as any).own_pa_name || "votre plateforme";
 
   const load = () => doc.id && sb().from("einvoice_events").select("*").eq("document_id", doc.id).order("created_at", { ascending: false }).limit(10).then(({ data }) => setEvents(data || []));
   useEffect(() => { load(); }, [doc.id, d.einvoice_status]);
 
   async function act(action: string) {
     setBusy(true); setMsg("");
-    try { const j = await callEInvoice(action, doc.id); if (j.doc) onDoc(j.doc); if (j.message) setMsg(j.message); }
+    try {
+      const j = action === "send" && own ? await sendOwn() : await callEInvoice(action, doc.id); if (j.doc) onDoc(j.doc); if (j.message) setMsg(j.message); }
     catch (e: any) { setMsg(`⚠️ ${e.message}`); }
     setBusy(false); load();
+  }
+
+  async function sendOwn() {
+    const { sb: client } = await import("@/lib/supabase");
+    const { data: { session } } = await client().auth.getSession();
+    const r = await fetch("/api/einvoice", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ action: "send", docId: doc.id, pdfBase64: await makePdf(doc, company) }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || "Erreur d'envoi");
+    return j;
+  }
+
+  async function downloadBoth() {
+    downloadXml();
+    (await buildPdf(doc, company)).save(`${doc.number}.pdf`);
+    try { const j = await callEInvoice("downloaded", doc.id); if (j.doc) onDoc(j.doc); } catch {}
+    load();
   }
 
   function downloadXml() {
@@ -38,7 +59,9 @@ export default function EInvoiceSection({ doc, company, onDoc }: { doc: Doc; com
       <div className="flex items-start justify-between gap-2">
         <div>
           <h2 className="font-bold">📡 Facture électronique</h2>
-          <p className="text-xs text-slate-500">{channel === "b2b" ? "Client professionnel : facture transmise via la plateforme agréée." : "Client particulier : pas de facture électronique, transmission des données de vente (e-reporting)."}</p>
+          <p className="text-xs text-slate-500">{channel === "b2b"
+            ? (own ? `Client professionnel : facture à déposer sur ${paName}.` : "Client professionnel : facture transmise via la plateforme agréée.")
+            : (own ? `Client particulier : pas de facture électronique. L'e-reporting se fait depuis ${paName}.` : "Client particulier : pas de facture électronique, transmission des données de vente (e-reporting).")}</p>
         </div>
         {st && <span className={`chip whitespace-nowrap ${st[1]}`}>{st[0]}</span>}
       </div>
@@ -55,7 +78,13 @@ export default function EInvoiceSection({ doc, company, onDoc }: { doc: Doc; com
 
       {!enabled && doc.status !== "draft" && <p className="text-xs text-slate-500">Non activée. <Link href="/app/parametres#facture-electronique" className="text-brand underline">Activer dans Mon entreprise</Link></p>}
 
-      {enabled && doc.status !== "draft" && (
+      {enabled && own && doc.status !== "draft" && channel === "b2b" && (
+        <div className="grid grid-cols-2 gap-2">
+          {(company as any).own_pa_email && <button className="btn-primary col-span-2" disabled={busy || errors.length > 0} onClick={() => act("send")}>{busy ? "…" : `📧 ${d.einvoice_id ? "Renvoyer" : "Envoyer"} à ${paName}`}</button>}
+          <button className="btn-ghost col-span-2" disabled={errors.length > 0} onClick={downloadBoth}>⬇️ Télécharger XML + PDF pour dépôt manuel</button>
+        </div>
+      )}
+      {enabled && !own && doc.status !== "draft" && (
         <div className="grid grid-cols-2 gap-2">
           {!d.einvoice_id
             ? <button className="btn-primary col-span-2" disabled={busy || errors.length > 0} onClick={() => act("send")}>{busy ? "…" : channel === "b2b" ? "📡 Transmettre la facture" : "📡 Transmettre l'e-reporting"}</button>
@@ -63,7 +92,7 @@ export default function EInvoiceSection({ doc, company, onDoc }: { doc: Doc; com
           {d.einvoice_id && doc.status === "paid" && d.einvoice_status !== "encaissee" && channel === "b2b" && <button className="btn-ghost" disabled={busy} onClick={() => act("payment")}>💶 Déclarer l'encaissement</button>}
         </div>
       )}
-      {doc.status !== "draft" && channel === "b2b" && <button className="w-full text-xs text-brand underline" onClick={downloadXml}>Télécharger le XML Factur-X (EN 16931)</button>}
+      {doc.status !== "draft" && channel === "b2b" && !own && <button className="w-full text-xs text-brand underline" onClick={downloadXml}>Télécharger le XML Factur-X (EN 16931)</button>}
       {msg && <p className="text-xs">{msg}</p>}
 
       {events.length > 0 && (

@@ -9,6 +9,8 @@ export const EINV_STATUS: Record<string, [string, string]> = {
   refusee: ["Refusée", "bg-red-100 text-red-700"],
   encaissee: ["Encaissée (déclarée)", "bg-green-100 text-green-800"],
   ereporting_ok: ["E-reporting transmis", "bg-green-100 text-green-800"],
+  envoyee_pa: ["Envoyée à votre plateforme", "bg-blue-100 text-blue-800"],
+  telechargee: ["Fichier téléchargé", "bg-slate-100 text-slate-700"],
   erreur: ["Erreur", "bg-red-100 text-red-700"],
 };
 
@@ -145,3 +147,5 @@ export function eReportingPayload(doc: Doc, co: Company) {
     paid_at: doc.paid_at || null, payment_method: doc.payment_method || null,
   };
 }
+
+export const KNOWN_PA = ["Pennylane", "Qonto", "Tiime", "Indy", "Sage", "Cegid", "Docoon", "Iopole", "B2Brouter", "Generix", "Esker", "Libeo", "Axonaut", "Sellsy", "Autre"];

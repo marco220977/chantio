@@ -13,6 +13,7 @@ import SignaturePad from "@/components/SignaturePad";
 import SiretField from "@/components/SiretField";
 import EInvoiceSection from "@/components/EInvoiceSection";
 import { callEInvoice } from "@/lib/einvoice-client";
+import { channelOf } from "@/lib/einvoice";
 import type { CatalogItem, Client, Doc, Line } from "@/lib/types";
 
 const emptyLine = (): Line => ({ label: "", qty: 1, unit: "u", unit_price: 0, vat_rate: 10 });
@@ -142,8 +143,19 @@ function Editor() {
     const { data: num, error } = await sb().rpc("next_number", { p_kind: doc!.kind === "credit" ? "A" : "F" });
     if (error) return setErr(error.message);
     const issued = await save({ number: num as string, status: "issued", issue_date: addDays(0) });
-    if (issued && (company as any)?.einvoice_enabled) {
-      try { const j = await callEInvoice("send", issued.id); if (j.doc) setDoc(j.doc); }
+    const co: any = company;
+    const ownAuto = co?.einvoice_mode === "own" && co?.own_pa_auto && co?.own_pa_email && channelOf(issued as Doc) === "b2b";
+    if (issued && co?.einvoice_enabled && (co?.einvoice_mode !== "own" || ownAuto)) {
+      try {
+        let j: any;
+        if (ownAuto) {
+          const { data: { session } } = await sb().auth.getSession();
+          const r = await fetch("/api/einvoice", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+            body: JSON.stringify({ action: "send", docId: issued.id, pdfBase64: await pdfBase64(issued, company!) }) });
+          j = await r.json(); if (!r.ok) throw new Error(j.error);
+        } else j = await callEInvoice("send", issued.id);
+        if (j.doc) setDoc(j.doc);
+      }
       catch (e: any) { setErr(`Facture émise, mais non transmise à la plateforme : ${e.message}`); }
     }
     if (issued) await sendEmail(issued);

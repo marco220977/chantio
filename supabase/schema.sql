@@ -380,3 +380,4 @@ create policy chantiers_delete on storage.objects for delete to authenticated us
 
 -- ---------- V1.13 : facture électronique ----------
 -- documents.einvoice_channel/status/id/updated_at ; companies.einvoice_enabled/account_id/mandate_at ; table einvoice_events
+-- V1.14 : companies.einvoice_mode (partner|own), own_pa_name, own_pa_email, own_pa_auto
