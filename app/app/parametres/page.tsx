@@ -6,6 +6,7 @@ import { sb } from "@/lib/supabase";
 import { useCompany } from "@/components/CompanyContext";
 import Header from "@/components/Header";
 import NumberingSection from "@/components/NumberingSection";
+import EInvoiceSettings from "@/components/EInvoiceSettings";
 import SiretField from "@/components/SiretField";
 import type { Company } from "@/lib/types";
 
@@ -161,6 +162,7 @@ function Settings() {
         <button className="btn-primary sticky bottom-24 w-full py-3.5 shadow-lg" onClick={save}>Enregistrer</button>
         {msg && <p className="fixed inset-x-4 top-4 z-50 rounded-xl bg-ink p-3 text-center text-sm font-semibold text-white shadow-lg">{msg}</p>}
         <NumberingSection />
+        <EInvoiceSettings company={company} reload={reload} />
         <section className="card space-y-3">
           <h2 className="font-bold">Mot de passe</h2>
           <input className="input" type="password" placeholder="Nouveau mot de passe" value={pwd} onChange={(e) => setPwd(e.target.value)} />

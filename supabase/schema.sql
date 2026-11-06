@@ -377,3 +377,6 @@ create policy chantiers_delete on storage.objects for delete to authenticated us
 
 -- ---------- V1.12 : avenants et suivi d'ouverture ----------
 -- documents.amends_id / amendment_no / amend_meta ; documents.viewed_at / last_viewed_at / view_count ; mark_quote_viewed()
+
+-- ---------- V1.13 : facture électronique ----------
+-- documents.einvoice_channel/status/id/updated_at ; companies.einvoice_enabled/account_id/mandate_at ; table einvoice_events

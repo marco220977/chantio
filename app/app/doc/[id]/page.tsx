@@ -11,6 +11,8 @@ import PdfPreview from "@/components/PdfPreview";
 import Modal from "@/components/Modal";
 import SignaturePad from "@/components/SignaturePad";
 import SiretField from "@/components/SiretField";
+import EInvoiceSection from "@/components/EInvoiceSection";
+import { callEInvoice } from "@/lib/einvoice-client";
 import type { CatalogItem, Client, Doc, Line } from "@/lib/types";
 
 const emptyLine = (): Line => ({ label: "", qty: 1, unit: "u", unit_price: 0, vat_rate: 10 });
@@ -140,6 +142,10 @@ function Editor() {
     const { data: num, error } = await sb().rpc("next_number", { p_kind: doc!.kind === "credit" ? "A" : "F" });
     if (error) return setErr(error.message);
     const issued = await save({ number: num as string, status: "issued", issue_date: addDays(0) });
+    if (issued && (company as any)?.einvoice_enabled) {
+      try { const j = await callEInvoice("send", issued.id); if (j.doc) setDoc(j.doc); }
+      catch (e: any) { setErr(`Facture émise, mais non transmise à la plateforme : ${e.message}`); }
+    }
     if (issued) await sendEmail(issued);
   }
 
@@ -416,6 +422,8 @@ function Editor() {
           <div><label className="label mt-2">Notes / conditions</label><textarea className="input text-sm" rows={2} disabled={!editable} value={doc.notes || ""} onChange={(e) => set({ notes: e.target.value })} /></div>
         </section>
 
+        {doc.kind !== "quote" && (doc.id || doc.status !== "draft") && <EInvoiceSection doc={doc} company={company} onDoc={(d) => setDoc(d)} />}
+
         {/* Signature */}
         {doc.signature_data && (
           <section className="card">
@@ -572,7 +580,10 @@ function Editor() {
         <Modal title="Enregistrer le paiement" onClose={() => setModal("")}>
           <div className="grid gap-2">
             {["Virement", "Chèque", "Espèces", "Carte bancaire"].map((m) => (
-              <button key={m} className="btn-ghost" onClick={async () => { setModal(""); await save({ status: "paid", paid_at: new Date().toISOString(), payment_method: m }); }}>{m}</button>
+              <button key={m} className="btn-ghost" onClick={async () => {
+                setModal(""); const paid = await save({ status: "paid", paid_at: new Date().toISOString(), payment_method: m });
+                if (paid && (paid as any).einvoice_id) { try { const j = await callEInvoice("payment", paid.id); if (j.doc) setDoc(j.doc); } catch {} }
+              }}>{m}</button>
             ))}
           </div>
         </Modal>
