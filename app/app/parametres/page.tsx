@@ -8,6 +8,7 @@ import Header from "@/components/Header";
 import NumberingSection from "@/components/NumberingSection";
 import EInvoiceSettings from "@/components/EInvoiceSettings";
 import AutomationSettings from "@/components/AutomationSettings";
+import PaymentSettings from "@/components/PaymentSettings";
 import SiretField from "@/components/SiretField";
 import type { Company } from "@/lib/types";
 
@@ -163,6 +164,7 @@ function Settings() {
         <button className="btn-primary sticky bottom-24 w-full py-3.5 shadow-lg" onClick={save}>Enregistrer</button>
         {msg && <p className="fixed inset-x-4 top-4 z-50 rounded-xl bg-ink p-3 text-center text-sm font-semibold text-white shadow-lg">{msg}</p>}
         <NumberingSection />
+        <PaymentSettings company={company} reload={reload} />
         <EInvoiceSettings company={company} reload={reload} />
         <AutomationSettings company={company} reload={reload} />
         <section className="card space-y-3">

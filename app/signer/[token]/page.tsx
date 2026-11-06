@@ -62,7 +62,10 @@ export default function Signer() {
       <PdfPreview inline build={build} filename={`Devis-${doc.number}.pdf`} />
 
       {doc.signed_at ? (
-        <div className="card bg-green-50 text-center text-green-800">✅ Devis signé par {doc.signer_name} le {new Date(doc.signed_at).toLocaleString("fr-FR")}. Merci !</div>
+        <div className="space-y-2">
+          <div className="card bg-green-50 text-center text-green-800">✅ Devis signé par {doc.signer_name} le {new Date(doc.signed_at).toLocaleString("fr-FR")}. Merci !</div>
+          {Number(doc.deposit_pct) > 0 && <a href={`/payer/${token}`} className="btn-brand w-full py-3.5">💳 Régler l'acompte de {doc.deposit_pct} % par carte</a>}
+        </div>
       ) : expired ? (
         <div className="card text-center text-slate-600">Ce devis a expiré. Contactez {company.name} pour une nouvelle proposition.</div>
       ) : doc.status === "refused" ? (

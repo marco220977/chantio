@@ -447,6 +447,10 @@ function Editor() {
             </div>
           </section>
         )}
+        {(doc as any).deposit_paid_at && <p className="card text-sm text-green-800">💳 Acompte réglé en ligne le {dateFr((doc as any).deposit_paid_at)}</p>}
+        {doc.kind === "invoice" && doc.status === "issued" && (company as any).stripe_account_ready && (
+          <button className="btn-ghost w-full text-sm" onClick={async () => { const u = `${location.origin}/payer/${doc.public_token}`; const nav = navigator as any; if (nav.share) await nav.share({ title: `Facture ${doc.number}`, text: `Réglez la facture ${doc.number} par carte : ${u}` }).catch(() => {}); else { await navigator.clipboard.writeText(u); alert("Lien de paiement copié"); } }}>💳 Partager le lien de paiement par carte</button>
+        )}
         {doc.status === "paid" && <p className="card text-sm text-green-800">✅ Payée le {dateFr(doc.paid_at)} ({doc.payment_method})</p>}
 
         {/* Actions */}

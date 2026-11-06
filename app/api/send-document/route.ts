@@ -42,9 +42,13 @@ export async function POST(req: Request) {
        <p>Veuillez trouver ci-joint notre ${label} n° <b>${esc(doc.number)}</b> du ${dfr(doc.issue_date)}, d'un montant de <b>${eur(doc.total_ttc)} TTC</b>${doc.kind === "invoice" && doc.due_date ? `, à régler avant le ${dfr(doc.due_date)}` : ""}.</p>
        ${doc.kind === "invoice" && co.iban ? `<p>Règlement par virement : IBAN ${esc(co.iban)}${co.bic ? ` — BIC ${esc(co.bic)}` : ""}</p>` : ""}`;
 
+  const payUrl = co.stripe_account_ready && ((doc.kind === "invoice" && doc.status === "issued") || (isQuote && Number(doc.deposit_pct) > 0 && !doc.deposit_paid_at))
+    ? `${process.env.NEXT_PUBLIC_APP_URL || origin}/payer/${doc.public_token}` : "";
+  if (payUrl && doc.kind === "invoice") await s.from("documents").update({ pay_link_url: payUrl }).eq("id", doc.id);
+  const payBtn = payUrl ? `<p style="margin:20px 0"><a href="${payUrl}" style="background:#0f1b2d;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold">💳 ${doc.kind === "invoice" ? "Payer la facture par carte" : `Régler l'acompte de ${doc.deposit_pct} % par carte`}</a></p>` : "";
   const html = `<div style="font-family:Arial,sans-serif;font-size:15px;color:#0f1b2d;max-width:560px">
     ${co.logo_url ? `<img src="${co.logo_url}" alt="" style="max-height:60px;margin-bottom:16px">` : ""}
-    ${body}
+    ${body}${payBtn}
     <p>Pour toute question, répondez simplement à cet e-mail${co.phone ? ` ou appelez-nous au ${esc(co.phone)}` : ""}.</p>
     <p>Cordialement,<br><b>${esc(co.name)}</b></p></div>`;
 
