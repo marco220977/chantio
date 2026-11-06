@@ -1,10 +1,11 @@
 "use client";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/config";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { computeTotals, dateFr, eur } from "@/lib/calc";
-import { downloadPdf } from "@/lib/pdf";
+import { buildPdf } from "@/lib/pdf";
+import PdfPreview from "@/components/PdfPreview";
 import SignaturePad from "@/components/SignaturePad";
 import type { Company, Doc } from "@/lib/types";
 
@@ -16,7 +17,15 @@ export default function Signer() {
   const [signing, setSigning] = useState(false);
 
   const load = () => anon().rpc("get_public_quote", { p_token: token }).then(({ data }) => setData(data || false));
-  useEffect(() => { load(); }, [token]);
+  useEffect(() => {
+    load();
+    // ne compte pas l'ouverture si c'est l'artisan connecté qui regarde son propre lien
+    import("@/lib/supabase").then(async ({ sb }) => {
+      const { data: { session } } = await sb().auth.getSession();
+      if (!session) anon().rpc("mark_quote_viewed", { p_token: token }).then(() => {});
+    });
+  }, [token]);
+  const build = useCallback(() => buildPdf((data as any).doc, (data as any).company), [data]);
 
   if (data === null) return <p className="p-10 text-center text-slate-400">Chargement…</p>;
   if (data === false) return <p className="p-10 text-center">Devis introuvable.</p>;
@@ -49,7 +58,8 @@ export default function Signer() {
         <div className="flex justify-between text-xl font-extrabold"><span>Total TTC</span><span>{eur(t.ttc)}</span></div>
         {!!doc.deposit_pct && <p className="text-sm text-slate-600">Acompte à la commande : {eur((t.ttc * Number(doc.deposit_pct)) / 100)} ({doc.deposit_pct} %)</p>}
       </div>
-      <button className="btn-ghost w-full" onClick={() => downloadPdf(doc, company)}>⬇️ Télécharger le devis PDF</button>
+      <h2 className="pt-2 font-bold">Le devis complet</h2>
+      <PdfPreview inline build={build} filename={`Devis-${doc.number}.pdf`} />
 
       {doc.signed_at ? (
         <div className="card bg-green-50 text-center text-green-800">✅ Devis signé par {doc.signer_name} le {new Date(doc.signed_at).toLocaleString("fr-FR")}. Merci !</div>

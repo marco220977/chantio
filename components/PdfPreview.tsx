@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type jsPDF from "jspdf";
 
 // Aperçu d'un PDF généré, rendu page par page en images (Chrome Android n'affiche pas les PDF intégrés)
-export default function PdfPreview({ build, filename, onClose }: { build: () => Promise<jsPDF>; filename: string; onClose: () => void }) {
+export default function PdfPreview({ build, filename, onClose, inline = false }: { build: () => Promise<jsPDF>; filename: string; onClose?: () => void; inline?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const [pdf, setPdf] = useState<jsPDF | null>(null);
   const [err, setErr] = useState("");
@@ -11,6 +11,8 @@ export default function PdfPreview({ build, filename, onClose }: { build: () => 
 
   useEffect(() => {
     let cancelled = false;
+    box.current?.querySelectorAll("canvas").forEach((c) => c.remove());
+    setPages(0);
     (async () => {
       try {
         const doc = await build();
@@ -45,6 +47,19 @@ export default function PdfPreview({ build, filename, onClose }: { build: () => 
     if (nav.canShare && nav.canShare({ files: [f] })) await nav.share({ files: [f], title: filename }).catch(() => {});
     else pdf.save(filename);
   }
+
+  if (inline) return (
+    <div className="space-y-2">
+      <div className="rounded-2xl bg-slate-600 p-2" ref={box}>
+        {!pages && !err && <p className="py-16 text-center text-sm text-white/80">Chargement du devis…</p>}
+        {err && <p className="py-8 text-center text-sm text-red-200">{err}</p>}
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <button className="btn-ghost" disabled={!pdf} onClick={() => pdf?.save(filename)}>⬇️ Télécharger</button>
+        <button className="btn-ghost" disabled={!pdf} onClick={share}>📤 Partager</button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-700">

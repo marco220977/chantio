@@ -49,6 +49,7 @@ export default function DocList({ kind }: { kind: "quote" | "invoice" }) {
               <p className="text-xs text-slate-400">
                 {d.kind === "credit" ? "Avoir " : ""}{d.number || "Brouillon"} · {dateFr(d.issue_date)}
                 {d.status === "issued" && d.due_date && d.due_date < today && <span className="ml-1 font-semibold text-red-600">· en retard</span>}
+                {d.kind === "quote" && d.status === "sent" && ((d as any).viewed_at ? <span className="ml-1 font-semibold text-blue-700">· 👁 vu</span> : <span className="ml-1">· non ouvert</span>)}
               </p>
             </div>
             <div className="text-right">

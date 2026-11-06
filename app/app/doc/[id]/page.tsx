@@ -279,6 +279,8 @@ function Editor() {
             <p className="text-sm text-slate-500">{[doc.client_snapshot.phone, doc.client_snapshot.email].filter(Boolean).join(" · ")}</p>
           )}
           {doc.sent_at && <p className="text-xs text-green-700">📧 Envoyé le {new Date(doc.sent_at).toLocaleString("fr-FR")} à {doc.sent_to}</p>}
+          {isQuote && (doc as any).viewed_at && <p className="text-xs text-blue-700">👁 Consulté par le client le {new Date((doc as any).viewed_at).toLocaleString("fr-FR")}{(doc as any).view_count > 1 ? ` · ${(doc as any).view_count} ouvertures, dernière le ${new Date((doc as any).last_viewed_at).toLocaleString("fr-FR")}` : ""}</p>}
+          {isQuote && doc.status === "sent" && !(doc as any).viewed_at && <p className="text-xs text-slate-500">👁 Pas encore ouvert par le client</p>}
           <div><label className="label">Objet</label><input className="input" disabled={!editable} placeholder="Ex : Remplacement chaudière gaz" value={doc.title || ""} onChange={(e) => set({ title: e.target.value })} /></div>
           <div><label className="label">Adresse du chantier</label><input className="input" disabled={!editable} value={doc.site_address || ""} onChange={(e) => set({ site_address: e.target.value })} /></div>
           <div className="grid grid-cols-2 gap-3">
