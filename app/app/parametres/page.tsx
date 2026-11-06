@@ -61,6 +61,7 @@ function Settings() {
   async function save() {
     const { id, plan, trial_ends_at, ...rest } = c as any;
     delete rest.stripe_customer_id; delete rest.stripe_subscription_id; delete rest.created_at;
+    for (const k of ["rge_valid_until"]) if (rest[k] === "") rest[k] = null;
     const { error } = await sb().from("companies").update(rest).eq("id", company!.id);
     setMsg(error ? error.message : "✅ Enregistré"); reload();
     setTimeout(() => setMsg(""), 2500);
@@ -149,6 +150,13 @@ function Settings() {
           {F({ k: "address", label: "Adresse" })}
           <div className="grid grid-cols-3 gap-2">{F({ k: "zip", label: "CP" })}<div className="col-span-2">{F({ k: "city", label: "Ville" })}</div></div>
           {F({ k: "phone", label: "Téléphone", type: "tel" })}{F({ k: "email", label: "E-mail", type: "email" })}
+        </section>
+        <section className="card space-y-3">
+          <h2 className="font-bold">Qualification RGE</h2>
+          <p className="text-xs text-slate-500">Indispensable pour que vos clients touchent MaPrimeRénov' et les primes CEE. Apparaît sur vos devis et factures.</p>
+          {F({ k: "rge_number", label: "N° de certificat RGE", ph: "ex. E-E123456" })}
+          <div className="grid grid-cols-2 gap-2">{F({ k: "rge_organism", label: "Organisme", ph: "Qualibat, Qualit'EnR…" })}{F({ k: "rge_valid_until", label: "Valable jusqu'au", type: "date" })}</div>
+          {F({ k: "rge_domains", label: "Domaines", ph: "PAC, chaudière biomasse, chauffe-eau thermodynamique…" })}
         </section>
         <section className="card space-y-3">
           <h2 className="font-bold">Assurance et paiement</h2>

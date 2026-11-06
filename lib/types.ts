@@ -14,7 +14,7 @@ export type Company = {
   city?: string; phone?: string; email?: string; iban?: string; bic?: string;
   insurance?: string; logo_url?: string; payment_terms_days?: number;
   late_penalty_rate?: string; quote_validity_days?: number; footer_note?: string;
-  plan?: string; trial_ends_at?: string; siret_verified_at?: string | null; naf?: string | null; cancel_at?: string | null; stripe_subscription_id?: string | null;
+  plan?: string; trial_ends_at?: string; rge_number?: string | null; rge_organism?: string | null; rge_domains?: string | null; rge_valid_until?: string | null; siret_verified_at?: string | null; naf?: string | null; cancel_at?: string | null; stripe_subscription_id?: string | null;
 };
 
 export type Client = {
@@ -36,5 +36,8 @@ export type Doc = {
   signer_name?: string; signature_data?: string; signer_photo?: string | null; source_quote_id?: string;
   paid_at?: string; payment_method?: string; created_at?: string; sent_at?: string; sent_to?: string;
   amends_id?: string | null; amendment_no?: number | null;
+  aid_scheme?: string | null; technical_visit_date?: string | null; housing_info?: string | null; aid_amount?: number | null; aid_provider?: string | null;
+  situation_no?: number | null; progress_pct?: number | null; retention_pct?: number | null; reverse_charge?: boolean | null;
+  meta?: { market_ht?: number; cum_pct?: number; prev_pct?: number; prev_ht?: number; quote_number?: string } | null;
   amend_meta?: { parent_number?: string; parent_date?: string; parent_signed_at?: string; base_ttc?: number; previous_ttc?: number } | null;
 };

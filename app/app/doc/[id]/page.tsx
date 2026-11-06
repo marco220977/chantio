@@ -80,7 +80,7 @@ function Editor() {
     if (doc.kind !== "quote" && !doc.due_date) setDoc({ ...doc, due_date: addDays(company.payment_terms_days ?? 30) });
   }, [doc, company]);
 
-  const totals = useMemo(() => computeTotals(doc?.lines || [], doc?.discount_pct, company?.vat_exempt), [doc, company]);
+  const totals = useMemo(() => computeTotals(doc?.lines || [], doc?.discount_pct, !!company?.vat_exempt || !!doc?.reverse_charge), [doc, company]);
   const margin = useMemo(() => {
     if (!doc) return null;
     const cost = doc.lines.reduce((s, l) => s + (Number(l.cost_price) || 0) * (Number(l.qty) || 0), 0);
@@ -109,6 +109,10 @@ function Editor() {
       notes: cur.notes, source_quote_id: cur.source_quote_id || null,
       signed_at: cur.signed_at || null, signer_name: cur.signer_name || null, signature_data: cur.signature_data || null, signer_photo: cur.signer_photo || null,
       paid_at: cur.paid_at || null, payment_method: cur.payment_method || null, number: cur.number || null,
+      aid_scheme: cur.aid_scheme || null, technical_visit_date: cur.technical_visit_date || null, housing_info: cur.housing_info || null,
+      aid_amount: cur.aid_amount ? Number(String(cur.aid_amount).replace(",", ".")) : null, aid_provider: cur.aid_provider || null,
+      retention_pct: Number(cur.retention_pct) || 0, reverse_charge: !!cur.reverse_charge,
+      situation_no: cur.situation_no || null, progress_pct: cur.progress_pct ?? null, meta: cur.meta || null,
     };
     if (cur.amends_id && ["draft", "sent"].includes(cur.status)) {
       const { data: p } = await s.from("documents").select("number, issue_date, signed_at, total_ttc").eq("id", cur.amends_id).single();
@@ -172,7 +176,7 @@ function Editor() {
     const lines = signedAv.length
       ? [...bake(saved.lines, saved.discount_pct), ...signedAv.flatMap((a) => bake(a.lines, a.discount_pct).map((l) => ({ ...l, label: `Avenant n° ${a.amendment_no} — ${l.label}` })))]
       : saved.lines;
-    const t = computeTotals(lines, signedAv.length ? 0 : saved.discount_pct, company!.vat_exempt);
+    const t = computeTotals(lines, signedAv.length ? 0 : saved.discount_pct, !!company!.vat_exempt || !!saved.reverse_charge);
     const refs = [`devis n° ${saved.number}${saved.signed_at ? ` accepté le ${dateFr(saved.signed_at)}` : ""}`,
       ...signedAv.map((a) => `avenant n° ${a.amendment_no} (${a.number}) accepté le ${dateFr(a.signed_at)}`)];
     const { data, error } = await s.from("documents").insert({
@@ -181,10 +185,36 @@ function Editor() {
       total_ht: t.ht, total_vat: t.vat, total_ttc: t.ttc,
       issue_date: addDays(0), due_date: addDays(company!.payment_terms_days ?? 30),
       notes: `Facture établie selon ${refs.join(" et ")}.`,
-      source_quote_id: saved.id,
+      source_quote_id: saved.id, reverse_charge: !!saved.reverse_charge, aid_scheme: saved.aid_scheme || null,
+      technical_visit_date: saved.technical_visit_date || null, housing_info: saved.housing_info || null, aid_provider: saved.aid_provider || null,
     }).select().single();
     if (error) return setErr(error.message);
     await s.from("documents").update({ status: "invoiced" }).in("id", [saved.id, ...signedAv.map((a) => a.id)]);
+    router.push(`/app/doc/${data.id}`);
+  }
+
+  async function createSituation(cumPct: number, retention: number) {
+    const s = sb();
+    const { data: prevs } = await s.from("documents").select("progress_pct, total_ht, situation_no").eq("source_quote_id", doc!.id).eq("kind", "invoice").not("situation_no", "is", null);
+    const prevPct = Math.max(0, ...(prevs || []).map((p: any) => Number(p.progress_pct) || 0));
+    const prevHt = (prevs || []).reduce((a: number, p: any) => a + Number(p.total_ht), 0);
+    if (cumPct <= prevPct || cumPct > 100) return setErr(`L'avancement cumulé doit être compris entre ${prevPct} % et 100 %.`);
+    const n = Math.max(0, ...(prevs || []).map((p: any) => p.situation_no || 0)) + 1;
+    const delta = (cumPct - prevPct) / 100;
+    const k = 1 - (Number(doc!.discount_pct) || 0) / 100;
+    const lines = doc!.lines.map((l) => ({ ...l, qty: Math.round(Number(l.qty) * delta * 10000) / 10000, unit_price: Math.round(Number(l.unit_price) * k * 100) / 100,
+      description: [l.description, `Avancement : ${cumPct} % cumulé (situation précédente ${prevPct} %)`].filter(Boolean).join("\n") }));
+    const t = computeTotals(lines, 0, !!company!.vat_exempt || !!doc!.reverse_charge);
+    const { data, error } = await s.from("documents").insert({
+      kind: "invoice", status: "draft", client_id: doc!.client_id, client_snapshot: doc!.client_snapshot, site_address: doc!.site_address,
+      title: `Situation n° ${n} — ${doc!.title || `devis ${doc!.number}`}`, lines, discount_pct: 0, total_ht: t.ht, total_vat: t.vat, total_ttc: t.ttc,
+      issue_date: addDays(0), due_date: addDays(company!.payment_terms_days ?? 30), source_quote_id: doc!.id, situation_no: n, progress_pct: cumPct,
+      retention_pct: retention, reverse_charge: !!doc!.reverse_charge,
+      meta: { market_ht: Number(doc!.total_ht), cum_pct: cumPct, prev_pct: prevPct, prev_ht: Math.round(prevHt * 100) / 100, quote_number: doc!.number },
+      notes: `Facture de situation n° ${n} établie selon devis n° ${doc!.number}${doc!.signed_at ? ` accepté le ${dateFr(doc!.signed_at)}` : ""}.`,
+    }).select().single();
+    if (error) return setErr(error.message);
+    if (cumPct >= 100) await s.from("documents").update({ status: "invoiced" }).eq("id", doc!.id);
     router.push(`/app/doc/${data.id}`);
   }
 
@@ -413,6 +443,43 @@ function Editor() {
           )}
         </section>
 
+        {/* Options : aides, autoliquidation, retenue */}
+        {(editable || doc.aid_scheme || doc.reverse_charge || Number(doc.retention_pct) > 0) && (
+          <section className="card space-y-3">
+            <h2 className="font-bold">Options</h2>
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" className="mt-1" disabled={!editable} checked={!!doc.reverse_charge} onChange={(e) => set({ reverse_charge: e.target.checked })} />
+              <span><b>Sous-traitance BTP : autoliquidation de la TVA</b><span className="block text-xs text-slate-500">Vous travaillez pour une entreprise du bâtiment : facture sans TVA, mention légale ajoutée.</span></span>
+            </label>
+            {!isQuote && (
+              <div className="flex items-center justify-between gap-2 text-sm">
+                <span><b>Retenue de garantie</b><span className="block text-xs text-slate-500">Marchés avec réception : retenue sur le TTC, libérable à 1 an.</span></span>
+                <select className="input !w-24 !py-1.5" disabled={!editable} value={Number(doc.retention_pct) || 0} onChange={(e) => set({ retention_pct: Number(e.target.value) })}>
+                  <option value={0}>Aucune</option><option value={5}>5 %</option>
+                </select>
+              </div>
+            )}
+            <div>
+              <label className="label">Aides à la rénovation</label>
+              <select className="input" disabled={!editable} value={doc.aid_scheme || ""} onChange={(e) => set({ aid_scheme: e.target.value || null })}>
+                <option value="">Aucune</option><option value="mpr">MaPrimeRénov'</option><option value="cee">Prime CEE</option><option value="mpr_cee">MaPrimeRénov' + CEE</option>
+              </select>
+            </div>
+            {doc.aid_scheme && (
+              <div className="space-y-2 rounded-xl bg-green-50 p-3">
+                {!(company as any).rge_number && <p className="text-xs font-semibold text-amber-800">⚠️ Renseignez votre qualification RGE dans Mon entreprise : sans RGE, le client n'a pas droit aux aides.</p>}
+                <div className="grid grid-cols-2 gap-2">
+                  <div><label className="label">Visite technique préalable</label><input type="date" className="input" disabled={!editable} value={doc.technical_visit_date || ""} onChange={(e) => set({ technical_visit_date: e.target.value })} /></div>
+                  <div><label className="label">Aide estimée (€)</label><input className="input" inputMode="decimal" disabled={!editable} value={doc.aid_amount ?? ""} onChange={(e) => set({ aid_amount: e.target.value as any })} /></div>
+                </div>
+                <div><label className="label">Organisme / obligé CEE</label><input className="input" disabled={!editable} placeholder="Ex : Anah, TotalEnergies, EDF…" value={doc.aid_provider || ""} onChange={(e) => set({ aid_provider: e.target.value })} /></div>
+                <div><label className="label">Logement</label><input className="input" disabled={!editable} placeholder="Maison individuelle, résidence principale, construite en 1985" value={doc.housing_info || ""} onChange={(e) => set({ housing_info: e.target.value })} /></div>
+                <p className="text-xs text-slate-600">Décrivez chaque équipement avec sa <b>marque, sa référence et ses performances</b> (puissance, COP, ETAS…), et séparez la fourniture de la pose : c'est exigé pour les primes.</p>
+              </div>
+            )}
+          </section>
+        )}
+
         {/* Totaux */}
         <section className="card space-y-2">
           {editable && (
@@ -425,7 +492,10 @@ function Editor() {
           {Object.entries(totals.byRate).filter(([r]) => Number(r) > 0).map(([r, v]) => (
             <div key={r} className="flex justify-between text-sm text-slate-500"><span>TVA {r.replace(".", ",")} %</span><span>{eur(v.vat)}</span></div>
           ))}
-          <div className="flex justify-between border-t pt-2 text-lg font-extrabold"><span>Total TTC</span><span>{eur(totals.ttc)}</span></div>
+          {doc.reverse_charge && <div className="flex justify-between text-sm text-slate-500"><span>TVA</span><span>Autoliquidation</span></div>}
+          <div className="flex justify-between border-t pt-2 text-lg font-extrabold"><span>{doc.reverse_charge ? "Total HT net" : "Total TTC"}</span><span>{eur(totals.ttc)}</span></div>
+          {!isQuote && Number(doc.retention_pct) > 0 && <div className="flex justify-between text-sm"><span>Retenue de garantie {doc.retention_pct} % · net à payer</span><span>{eur(totals.ttc * (1 - Number(doc.retention_pct) / 100))}</span></div>}
+          {isQuote && doc.aid_scheme && Number(doc.aid_amount) > 0 && <div className="flex justify-between text-sm text-green-700"><span>Reste à charge après aide</span><span>{eur(totals.ttc - Number(doc.aid_amount))}</span></div>}
           {margin && (
             <button type="button" className="ml-auto block text-right text-xs text-slate-400"
               onClick={() => { setShowMargin(true); setTimeout(() => setShowMargin(false), 5000); }}>
@@ -476,6 +546,14 @@ function Editor() {
           )}
           {doc.id && isQuote && ["signed", "sent"].includes(doc.status) && (
             <button className="btn-ghost w-full" onClick={depositInvoice}>Facture d'acompte</button>
+          )}
+          {doc.id && isQuote && !doc.amends_id && doc.status === "signed" && (
+            <button className="btn-ghost w-full" onClick={() => {
+              const v = Number((prompt("Avancement CUMULÉ des travaux à ce jour (en %) ?", "30") || "").replace(",", "."));
+              if (!v) return;
+              const ret = confirm("Appliquer une retenue de garantie de 5 % ?") ? 5 : 0;
+              createSituation(v, ret);
+            }}>📊 Facture de situation (avancement)</button>
           )}
           {doc.id && !isQuote && doc.status === "draft" && (
             <button className="btn-brand w-full py-3.5" onClick={issueInvoice}>✅ Émettre et envoyer {doc.kind === "credit" ? "l'avoir" : "la facture"}</button>

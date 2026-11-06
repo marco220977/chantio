@@ -30,7 +30,7 @@ export default function Signer() {
   if (data === null) return <p className="p-10 text-center text-slate-400">Chargement…</p>;
   if (data === false) return <p className="p-10 text-center">Devis introuvable.</p>;
   const { doc, company } = data;
-  const t = computeTotals(doc.lines, doc.discount_pct, company.vat_exempt);
+  const t = computeTotals(doc.lines, doc.discount_pct, !!company.vat_exempt || !!doc.reverse_charge);
   const expired = doc.valid_until && doc.valid_until < new Date().toISOString().slice(0, 10);
   const canSign = ["draft", "sent"].includes(doc.status) && !expired;
 

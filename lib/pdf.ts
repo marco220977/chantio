@@ -24,7 +24,8 @@ export async function buildPdf(doc: Doc, company: Company): Promise<jsPDF> {
   const W = 210, M = 15;
   const isQuote = doc.kind === "quote";
   const isAvenant = isQuote && !!doc.amends_id;
-  const title = isAvenant ? `AVENANT N° ${doc.amendment_no || ""}` : isQuote ? "DEVIS" : doc.kind === "credit" ? "AVOIR" : "FACTURE";
+  const title = isAvenant ? `AVENANT N° ${doc.amendment_no || ""}` : isQuote ? "DEVIS" : doc.kind === "credit" ? "AVOIR" : doc.situation_no ? `SITUATION N° ${doc.situation_no}` : "FACTURE";
+  const reverse = !!doc.reverse_charge;
   const c = doc.client_snapshot || {};
   let y = M;
 
@@ -40,6 +41,7 @@ export async function buildPdf(doc: Doc, company: Company): Promise<jsPDF> {
     company.phone && `Tél. ${company.phone}`, company.email,
     company.siret && `SIRET ${company.siret}`,
     company.vat_number && `TVA ${company.vat_number}`,
+    company.rge_number && `RGE n° ${company.rge_number}${company.rge_organism ? ` (${company.rge_organism})` : ""}`,
   ].filter(Boolean) as string[];
   pdf.text(coLines, M, y + 9);
 
@@ -68,7 +70,7 @@ export async function buildPdf(doc: Doc, company: Company): Promise<jsPDF> {
   y += 3;
 
   // Lignes
-  const exempt = !!company.vat_exempt;
+  const exempt = !!company.vat_exempt || reverse;
   autoTable(pdf, {
     startY: y + 2,
     margin: { left: M, right: M },
@@ -91,16 +93,38 @@ export async function buildPdf(doc: Doc, company: Company): Promise<jsPDF> {
   if (doc.discount_pct) rows.push([`Remise ${doc.discount_pct} %`, "incluse"]);
   rows.push(["Total HT", money(t.ht)]);
   if (!exempt) for (const [rate, v] of Object.entries(t.byRate)) if (Number(rate) > 0) rows.push([`TVA ${rate.replace(".", ",")} % sur ${money(v.base)}`, money(v.vat)]);
-  rows.push(["Total TTC", money(t.ttc)]);
+  if (reverse) rows.push(["TVA", "Autoliquidation"]);
+  rows.push([reverse ? "Total HT net" : "Total TTC", money(t.ttc)]);
   if (isQuote && doc.deposit_pct) rows.push([`Acompte à la commande (${doc.deposit_pct} %)`, money((t.ttc * Number(doc.deposit_pct)) / 100)]);
+  const retention = !isQuote && Number(doc.retention_pct) > 0 ? Math.round(t.ttc * Number(doc.retention_pct)) / 100 : 0;
+  if (retention) { rows.push([`Retenue de garantie ${doc.retention_pct} %`, `- ${money(retention)}`]); rows.push(["Net à payer", money(t.ttc - retention)]); }
+  if (isQuote && doc.aid_scheme && Number(doc.aid_amount) > 0) { rows.push([`Aide estimée${doc.aid_provider ? ` (${doc.aid_provider})` : ""}`, `- ${money(Number(doc.aid_amount))}`]); rows.push(["Reste à charge estimé", money(t.ttc - Number(doc.aid_amount))]); }
   if (y + rows.length * 6 > 270) { pdf.addPage(); y = M; }
   rows.forEach(([k, v], i) => {
-    const bold = k === "Total TTC";
+    const bold = ["Total TTC", "Total HT net", "Net à payer", "Reste à charge estimé"].includes(k);
     pdf.setFont("helvetica", bold ? "bold" : "normal").setFontSize(bold ? 11 : 9);
     pdf.text(k, 140, y + i * 6, { align: "right" });
     pdf.text(v, W - M, y + i * 6, { align: "right" });
   });
   y += rows.length * 6 + 4;
+
+  // Récapitulatif de situation de travaux
+  if (doc.situation_no && doc.meta) {
+    const m = doc.meta;
+    const recap: [string, string][] = [
+      [`Montant du marché HT (devis n° ${m.quote_number || ""})`, money(Number(m.market_ht) || 0)],
+      [`Avancement cumulé à ce jour : ${m.cum_pct} %`, money(((Number(m.market_ht) || 0) * Number(m.cum_pct)) / 100)],
+      [`Situations précédentes (${m.prev_pct || 0} %)`, `- ${money(Number(m.prev_ht) || 0)}`],
+      [`Montant HT de la présente situation`, money(t.ht)],
+    ];
+    if (y + recap.length * 5.5 + 8 > 275) { pdf.addPage(); y = M; }
+    pdf.setDrawColor(220).setFillColor(239, 246, 255).roundedRect(M, y - 4, W - 2 * M, recap.length * 5.5 + 5, 2, 2, "FD");
+    recap.forEach(([k, v], i) => {
+      pdf.setFont("helvetica", i === recap.length - 1 ? "bold" : "normal").setFontSize(9);
+      pdf.text(k, M + 3, y + i * 5.5); pdf.text(v, W - M - 3, y + i * 5.5, { align: "right" });
+    });
+    y += recap.length * 5.5 + 6;
+  }
 
   // Récapitulatif du marché (avenant)
   if (isAvenant && doc.amend_meta) {
@@ -124,7 +148,17 @@ export async function buildPdf(doc: Doc, company: Company): Promise<jsPDF> {
 
   // Mentions légales
   const mentions: string[] = [];
-  if (exempt) mentions.push("TVA non applicable, art. 293 B du CGI.");
+  if (reverse) mentions.push("Autoliquidation : TVA due par le preneur assujetti, en application de l'article 283-2 nonies du CGI (travaux de construction réalisés en sous-traitance).");
+  else if (exempt) mentions.push("TVA non applicable, art. 293 B du CGI.");
+  if (retention) mentions.push(`Retenue de garantie de ${doc.retention_pct} % (loi n° 71-584 du 16 juillet 1971), libérable un an après la réception des travaux, sauf réserves non levées ou caution bancaire.`);
+  if (doc.aid_scheme) {
+    const rge = company.rge_number ? `Entreprise titulaire de la qualification RGE n° ${company.rge_number}${company.rge_organism ? ` délivrée par ${company.rge_organism}` : ""}${company.rge_domains ? `, domaine(s) : ${company.rge_domains}` : ""}${company.rge_valid_until ? `, valable jusqu'au ${dateFr(company.rge_valid_until)}` : ""}.` : "";
+    if (rge) mentions.push(rge);
+    if (doc.technical_visit_date) mentions.push(`Visite technique préalable réalisée le ${dateFr(doc.technical_visit_date)}.`);
+    if (doc.housing_info) mentions.push(`Logement : ${doc.housing_info}.`);
+    if (["mpr", "mpr_cee"].includes(doc.aid_scheme)) mentions.push("Devis établi en vue d'une demande d'aide MaPrimeRénov'. Les travaux ne doivent pas commencer avant le dépôt de la demande d'aide par le bénéficiaire. Le montant de l'aide est indicatif et dépend de la décision de l'Anah.");
+    if (["cee", "mpr_cee"].includes(doc.aid_scheme)) mentions.push(`Opération éligible aux certificats d'économies d'énergie (CEE)${doc.aid_provider ? ` — prime proposée par ${doc.aid_provider}` : ""}. Le bénéficiaire déclare avoir reçu la proposition de prime avant la signature du présent devis. Les équipements sont décrits par leur marque, référence et performances.`);
+  }
   const reduced = !exempt && doc.lines.some((l) => [5.5, 10].includes(Number(l.vat_rate)));
   if (reduced) mentions.push("Taux réduit de TVA appliqué : le client certifie que les travaux portent sur un local à usage d'habitation achevé depuis plus de deux ans (art. 278-0 bis A et 279-0 bis du CGI).");
   if (company.insurance) mentions.push(`Assurance décennale : ${company.insurance}.`);

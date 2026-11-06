@@ -1,5 +1,6 @@
 // Facture électronique : canal (B2B / B2C), contrôles EN 16931 et XML Factur-X (CII, profil EN16931)
 import type { Company, Doc } from "./types";
+import { vatFromSiren } from "./siret";
 
 export const EINV_STATUS: Record<string, [string, string]> = {
   a_envoyer: ["À transmettre", "bg-slate-100 text-slate-700"],
@@ -47,6 +48,7 @@ export function buildFacturX(doc: Doc, co: Company): string {
   const credit = doc.kind === "credit";
   const sign = credit ? -1 : 1; // un avoir est exprimé en montants positifs avec le code 381
   const k = 1 - (Number(doc.discount_pct) || 0) / 100;
+  const reverse = !!doc.reverse_charge;
   const exempt = !!co.vat_exempt;
   const c: any = doc.client_snapshot || {};
 
@@ -54,8 +56,8 @@ export function buildFacturX(doc: Doc, co: Company): string {
     const qty = sign * (Number(l.qty) || 0);
     const net = (Number(l.unit_price) || 0) * k;
     const total = r2(qty * net);
-    const rate = exempt ? 0 : Number(l.vat_rate) || 0;
-    return { i: i + 1, l, qty, net, total, rate, cat: exempt || rate === 0 ? "E" : "S" };
+    const rate = exempt || reverse ? 0 : Number(l.vat_rate) || 0;
+    return { i: i + 1, l, qty, net, total, rate, cat: reverse ? "AE" : exempt || rate === 0 ? "E" : "S" };
   });
   const groups: Record<string, { base: number; rate: number; cat: string }> = {};
   for (const x of lines) { const key = `${x.cat}${x.rate}`; groups[key] ??= { base: 0, rate: x.rate, cat: x.cat }; groups[key].base += x.total; }
@@ -103,7 +105,7 @@ export function buildFacturX(doc: Doc, co: Company): string {
     <ram:ApplicableHeaderTradeAgreement>
       <ram:SellerTradeParty>${party(co.name, co.siret || "", co, co.email, co.vat_exempt ? undefined : co.vat_number)}
       </ram:SellerTradeParty>
-      <ram:BuyerTradeParty>${party(c.name || "Client", c.siret || "", c, c.email)}
+      <ram:BuyerTradeParty>${party(c.name || "Client", c.siret || "", c, c.email, reverse ? (c.vat_number || (digits(c.siret).length >= 9 ? vatFromSiren(digits(c.siret).slice(0, 9)) : undefined)) : undefined)}
       </ram:BuyerTradeParty>
     </ram:ApplicableHeaderTradeAgreement>
     <ram:ApplicableHeaderTradeDelivery>
@@ -116,8 +118,10 @@ export function buildFacturX(doc: Doc, co: Company): string {
       <ram:ApplicableTradeTax>
         <ram:CalculatedAmount>${amt(t.tax)}</ram:CalculatedAmount><ram:TypeCode>VAT</ram:TypeCode>
         ${t.cat === "E" ? `<ram:ExemptionReason>${exempt ? "TVA non applicable, art. 293 B du CGI" : "Exonération"}</ram:ExemptionReason>` : ""}
+        ${t.cat === "AE" ? `<ram:ExemptionReason>Autoliquidation - article 283-2 nonies du CGI</ram:ExemptionReason>` : ""}
         <ram:BasisAmount>${amt(t.base)}</ram:BasisAmount><ram:CategoryCode>${t.cat}</ram:CategoryCode>
         ${t.cat === "E" && exempt ? `<ram:ExemptionReasonCode>VATEX-FR-FRANCHISE</ram:ExemptionReasonCode>` : ""}
+        ${t.cat === "AE" ? `<ram:ExemptionReasonCode>VATEX-EU-AE</ram:ExemptionReasonCode>` : ""}
         ${t.cat === "S" ? `<ram:DueDateTypeCode>72</ram:DueDateTypeCode>` : ""}
         <ram:RateApplicablePercent>${t.rate}</ram:RateApplicablePercent>
       </ram:ApplicableTradeTax>`).join("")}
