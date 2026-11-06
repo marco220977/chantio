@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { CompanyProvider, useCompany } from "@/components/CompanyContext";
 import { sb } from "@/lib/supabase";
+import OfflineBar from "@/components/OfflineBar";
 
 const SUP_TABS = [
   { href: "/app", label: "Accueil", icon: "⌂" },
@@ -52,6 +53,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <div className="mx-auto min-h-screen max-w-2xl pb-24">
+        <OfflineBar />
         <TrialBanner />
         {blocked ? (
           <div className="p-8 text-center">
