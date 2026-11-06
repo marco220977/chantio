@@ -20,7 +20,7 @@ const TECH_TABS = [
   { href: "/app/sav", label: "SAV", icon: "🛠" },
   { href: "/app/menu", label: "Menu", icon: "☰" },
 ];
-const SUP_ONLY = ["/app/devis", "/app/factures", "/app/doc", "/app/chiffre-affaires", "/app/export", "/app/abonnement", "/app/catalogue", "/app/equipe", "/app/scan-x"];
+const SUP_ONLY = ["/app/devis", "/app/factures", "/app/doc", "/app/chiffre-affaires", "/app/export", "/app/abonnement", "/app/catalogue", "/app/equipe", "/app/commandes"];
 
 function TrialBanner() {
   const { company, isSup } = useCompany();

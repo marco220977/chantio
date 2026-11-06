@@ -19,6 +19,7 @@ export async function POST(req: Request) {
   const input = await req.json();
   const { docId, pdfBase64, to, origin } = input;
   if (input.type === "invite") return sendInvite(s, input);
+  if (input.type === "po") return sendPo(s, input);
   if (["contract", "report", "renewal", "reception", "sav"].includes(input.type)) return sendMaintenance(s, input);
   const { data: doc } = await s.from("documents").select("*").eq("id", docId).single();
   if (!doc) return NextResponse.json({ error: "Document introuvable" }, { status: 404 });
@@ -167,5 +168,25 @@ async function sendInvite(s: any, body: any) {
   });
   if (!r.ok) { const j = await r.json().catch(() => ({})); return NextResponse.json({ error: `Envoi refusé : ${j.message || r.status}` }, { status: 502 }); }
   await s.from("invitations").update({ sent_at: new Date().toISOString() }).eq("id", inv.id);
+  return NextResponse.json({ ok: true });
+}
+
+async function sendPo(s: any, body: any) {
+  const { data: po } = await s.from("purchase_orders").select("*").eq("id", body.id).single();
+  if (!po) return NextResponse.json({ error: "Bon de commande introuvable" }, { status: 404 });
+  const { data: co } = await s.from("companies").select("*").single();
+  const html = `<div style="font-family:Arial,sans-serif;font-size:15px;color:#0f1b2d;max-width:560px">
+    <p>Bonjour,</p><p>Veuillez trouver ci-joint notre bon de commande n° <b>${esc(po.number)}</b> (${eur(po.total_ht)} HT, ${po.lines.length} article(s)).</p>
+    ${po.delivery_address ? `<p>Livraison : ${esc(po.delivery_address)}</p>` : ""}
+    <p>Merci de nous confirmer la disponibilité et le délai.</p><p>Cordialement,<br><b>${esc(co.name)}</b>${co.phone ? `<br>${esc(co.phone)}` : ""}</p></div>`;
+  const r = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: { "api-key": process.env.BREVO_API_KEY!, "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify({ sender: { name: co.name, email: process.env.EMAIL_FROM }, replyTo: co.email ? { email: co.email } : undefined,
+      to: [{ email: body.to }], bcc: co.email ? [{ email: co.email }] : undefined, subject: `Bon de commande ${po.number} — ${co.name}`, htmlContent: html,
+      attachment: body.pdfBase64 ? [{ name: `${po.number}.pdf`, content: body.pdfBase64 }] : undefined }),
+  });
+  if (!r.ok) { const j = await r.json().catch(() => ({})); return NextResponse.json({ error: `Envoi refusé : ${j.message || r.status}` }, { status: 502 }); }
+  await s.from("purchase_orders").update({ status: "sent", sent_at: new Date().toISOString(), sent_to: body.to }).eq("id", po.id);
   return NextResponse.json({ ok: true });
 }

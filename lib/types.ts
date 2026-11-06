@@ -6,6 +6,7 @@ export type Line = {
   unit_price: number; // HT
   vat_rate: number;
   cost_price?: number; // prix d'achat HT (interne, non imprimé)
+  supplier?: string | null; ref?: string | null; components?: Component[] | null;
 };
 
 export type Company = {
@@ -25,7 +26,9 @@ export type Client = {
 export type CatalogItem = {
   id: string; category: string; label: string; description?: string; unit: string;
   unit_price: number; vat_rate: number; cost_price?: number;
+  supplier?: string | null; ref?: string | null; components?: Component[] | null;
 };
+export type Component = { label: string; qty: number; unit: string; cost_price: number; unit_price: number; supplier?: string | null; ref?: string | null };
 
 export type Doc = {
   id: string; kind: "quote" | "invoice" | "credit"; number?: string; status: string;

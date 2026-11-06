@@ -6,6 +6,7 @@ import { sb } from "@/lib/supabase";
 import { eur, VAT_RATES } from "@/lib/calc";
 import Header from "@/components/Header";
 import Modal from "@/components/Modal";
+import KitEditor from "@/components/KitEditor";
 import type { CatalogItem } from "@/lib/types";
 
 const STARTER: Omit<CatalogItem, "id">[] = [
@@ -114,7 +115,8 @@ function Catalogue() {
   async function save() {
     if (!edit?.label) return;
     const { id, ...rest } = edit as CatalogItem;
-    const row = { ...rest, unit_price: Number(String(rest.unit_price).replace(",", ".")) || 0, cost_price: Number(String(rest.cost_price ?? 0).replace(",", ".")) || 0 };
+    const row: any = { ...rest, unit_price: Number(String(rest.unit_price).replace(",", ".")) || 0, cost_price: Number(String(rest.cost_price ?? 0).replace(",", ".")) || 0 };
+    row.components = (rest as any).components?.length ? (rest as any).components : null;
     id ? await sb().from("catalog_items").update(row).eq("id", id) : await sb().from("catalog_items").insert(row);
     setEdit(null); load(); setVersion((v) => v + 1);
   }
@@ -164,7 +166,7 @@ function Catalogue() {
               <div className="space-y-2">
                 {rows.map((i) => (
                   <button key={i.id} className="card flex w-full justify-between gap-3 text-left" onClick={() => setEdit(i)}>
-                    <span className="font-medium">{i.label}</span>
+                    <span className="font-medium">{(i as any).components ? "🧩 " : ""}{i.label}</span>
                     <span className="whitespace-nowrap text-sm">{eur(i.unit_price)}<span className="text-slate-400"> /{i.unit}</span></span>
                   </button>
                 ))}
@@ -182,6 +184,11 @@ function Catalogue() {
             {(edit as any).supplier && <p className="rounded-lg bg-slate-50 p-2 text-xs text-slate-600">🏭 {(edit as any).supplier} · réf. {(edit as any).ref}{(edit as any).public_price ? ` · prix public ${eur((edit as any).public_price)}` : ""}. Ce prix sera écrasé au prochain import du tarif.</p>}
             <div><label className="label">Désignation</label><input className="input" value={edit.label || ""} onChange={(e) => setEdit({ ...edit, label: e.target.value })} /></div>
             <div><label className="label">Description</label><textarea className="input" rows={2} value={edit.description || ""} onChange={(e) => setEdit({ ...edit, description: e.target.value })} /></div>
+            {!(edit as any).supplier && (
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!(edit as any).components} onChange={(e) => setEdit({ ...edit, components: e.target.checked ? [] : null } as any)} />
+                <span><b>Ouvrage composé</b> (kit : fournitures + main d'œuvre, prix calculé)</span></label>
+            )}
+            {(edit as any).components && <KitEditor value={(edit as any).components} onChange={(v, t) => setEdit({ ...edit, components: v, unit_price: t.sale, cost_price: t.cost } as any)} />}
             <div className="grid grid-cols-3 gap-2">
               <div><label className="label">Prix HT</label><input className="input" inputMode="decimal" value={edit.unit_price ?? ""} onChange={(e) => setEdit({ ...edit, unit_price: e.target.value as any })} /></div>
               <div><label className="label">Unité</label><input className="input" value={edit.unit || ""} onChange={(e) => setEdit({ ...edit, unit: e.target.value })} /></div>

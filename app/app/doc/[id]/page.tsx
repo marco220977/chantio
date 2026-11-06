@@ -17,6 +17,13 @@ import { channelOf } from "@/lib/einvoice";
 import type { CatalogItem, Client, Doc, Line } from "@/lib/types";
 
 const emptyLine = (): Line => ({ label: "", qty: 1, unit: "u", unit_price: 0, vat_rate: 10 });
+const lineFromItem = (c: any): Line => ({
+  label: c.label, qty: 1, unit: c.unit, unit_price: Number(c.unit_price), vat_rate: Number(c.vat_rate), cost_price: Number(c.cost_price) || 0,
+  supplier: c.supplier || null, ref: c.ref || null, components: c.components?.length ? c.components : null,
+  description: c.components?.length
+    ? [c.description, "Comprend : " + c.components.map((k: any) => `${k.qty} ${k.unit} ${k.label}`).join(" ; ")].filter(Boolean).join("\n")
+    : c.description,
+});
 
 function Editor() {
   const { id } = useParams<{ id: string }>();
@@ -574,6 +581,7 @@ function Editor() {
           {doc.id && isQuote && editable && <button className="btn-ghost w-full" onClick={() => save({ status: "refused" })}>Marquer refusé</button>}
           {doc.id && doc.status === "draft" && <button className="btn-danger w-full" onClick={remove}>Supprimer le brouillon</button>}
           {doc.id && isQuote && ["signed", "invoiced"].includes(doc.status) && <button className="btn-brand w-full" onClick={createAmendment}>➕ Créer un avenant (travaux en plus ou en moins)</button>}
+          {doc.id && isQuote && ["signed", "invoiced"].includes(doc.status) && <Link href={`/app/commandes/${doc.id}`} className="btn-ghost w-full">🛒 Bons de commande fournisseurs</Link>}
           {doc.id && isQuote && !doc.amends_id && ["signed", "invoiced"].includes(doc.status) && <Link href={`/app/chantiers/nouveau?doc=${doc.id}`} className="btn-ghost w-full">🏗️ Ouvrir le suivi de chantier</Link>}
           {doc.id && doc.client_id && <Link href={`/app/planning?doc=${doc.id}&client=${doc.client_id}`} className="btn-ghost w-full">🗓 Planifier l'intervention</Link>}
         </section>
@@ -589,7 +597,7 @@ function Editor() {
               <p className="label">Tarifs fournisseurs</p>
               {supRes.map((c: any) => (
                 <button key={c.id} className="card w-full text-left" onClick={() => {
-                  set({ lines: [...doc.lines, { label: c.label, description: c.description, qty: 1, unit: c.unit, unit_price: Number(c.unit_price), vat_rate: Number(c.vat_rate), cost_price: Number(c.cost_price) || 0 }] });
+                  set({ lines: [...doc.lines, lineFromItem(c)] });
                   setModal("");
                 }}>
                   <p className="text-xs text-slate-400">🏭 {c.supplier} · {c.ref}</p>
@@ -614,7 +622,7 @@ function Editor() {
           <div className="space-y-2">
             {catalog.filter((c) => (catCat === "all" || c.category === catCat) && (!catQ || `${c.label} ${c.category}`.toLowerCase().includes(catQ.toLowerCase()))).map((c) => (
               <button key={c.id} className="card w-full text-left" onClick={() => {
-                set({ lines: [...doc.lines, { label: c.label, description: c.description, qty: 1, unit: c.unit, unit_price: Number(c.unit_price), vat_rate: Number(c.vat_rate), cost_price: Number(c.cost_price) || 0 }] });
+                set({ lines: [...doc.lines, lineFromItem(c)] });
                 setModal("");
               }}>
                 <p className="text-xs text-slate-400">{c.category}</p>
