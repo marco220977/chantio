@@ -388,3 +388,4 @@ alter table receptions add column if not exists intervention_id uuid references 
 alter table receptions add column if not exists photos text[] not null default '{}';
 -- companies.email_after_sign ('auto','ask','never')
 alter table companies add column if not exists email_after_sign text not null default 'ask';
+-- (voir migration "app_feedback" : tables platform_admins, feedback ; fonction is_platform_admin() ; RLS)

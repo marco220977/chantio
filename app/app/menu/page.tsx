@@ -11,11 +11,12 @@ const SUP = [
   ["/app/quitus", "✅", "Quitus / PV de réception"], ["/app/entretien", "🔧", "Contrats et attestations d'entretien"],
   ["/app/chiffre-affaires", "📈", "Chiffre d'affaires"], ["/app/catalogue", "📚", "Catalogue"], ["/app/scan", "📷", "Scanner une plaque"],
   ["/app/parametres", "🏢", "Mon entreprise"], ["/app/abonnement", "⭐", "Abonnement / se désabonner"], ["/app/export", "📊", "Export comptable"],
+  ["/app/suggestions", "💡", "Suggestions & problèmes"],
   ["/legal/cgv", "⚖️", "CGU, confidentialité, mentions légales"],
 ];
 const TECH = [
   ["/app/clients", "📇", "Clients"], ["/app/quitus", "✅", "Quitus / PV de réception"], ["/app/scan", "📷", "Scanner une plaque"],
-  ["/app/parametres", "👤", "Mon profil"], ["/legal/confidentialite", "⚖️", "Confidentialité"],
+  ["/app/parametres", "👤", "Mon profil"], ["/app/suggestions", "💡", "Suggestions & problèmes"], ["/legal/confidentialite", "⚖️", "Confidentialité"],
 ];
 
 export default function Menu() {
