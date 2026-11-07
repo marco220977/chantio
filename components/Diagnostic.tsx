@@ -18,6 +18,7 @@ const BRANDS: [string, RegExp][] = [
   ["ELM Leblanc", /e\.?l\.?m|leblanc|megalis|mégalis|egalis|égalis|acleis|odealis/i],
 ];
 const brandOf = (eq: string) => BRANDS.find(([, r]) => r.test(eq))?.[0] || "";
+const searchUrl = (n: Notice) => "https://www.google.com/search?q=" + encodeURIComponent(`notice ${n.brand} ${(n.range_label || "").split(/[(,—]/)[0].trim()} code erreur ${n.code} filetype:pdf`);
 const isUrl = (s?: string | null) => !!s && /^https?:\/\//.test(s);
 
 export function noticeText(n: Notice) {
@@ -103,7 +104,7 @@ export default function Diagnostic({ equipment = "", onUse }: { equipment?: stri
               {n.range_label && <p className="text-[11px] text-slate-500">{n.range_label}</p>}
               <p className="mt-1"><b>{n.code}</b> : {n.meaning}</p>
               {n.causes && n.causes !== "—" && <p className="mt-1 text-slate-700"><b>À vérifier :</b> {n.causes}</p>}
-              <p className="mt-1 text-[11px] text-slate-500">{n.kind && <span className="chip mr-1 bg-white">{n.kind}</span>}{isUrl(n.source) ? <a href={n.source!} target="_blank" rel="noreferrer" className="text-brand underline">Voir la notice</a> : n.source}</p>
+              <p className="mt-1 text-[11px] text-slate-500">{n.kind && <span className="chip mr-1 bg-white">{n.kind}</span>}{isUrl(n.source) ? <a href={n.source!} target="_blank" rel="noreferrer" className="mr-3 text-brand underline">Voir la notice</a> : <span className="mr-2">{n.source}</span>}<a href={searchUrl(n)} target="_blank" rel="noreferrer" className="text-brand underline">🔎 Chercher la notice</a></p>
               {onUse && <button className="btn-ghost mt-2 w-full !py-1.5 text-sm" onClick={() => onUse(noticeText(n))}>📝 Reporter dans le SAV</button>}
             </div>
           ))}
