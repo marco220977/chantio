@@ -31,12 +31,16 @@ function Editor() {
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [upl, setUpl] = useState("");
   const [invoiceId, setInvoiceId] = useState<string | null>(null);
+  const [ivBill, setIvBill] = useState<string | null>(null);
 
   useEffect(() => {
     const s = sb();
     s.from("clients").select("*").order("name").then(({ data }) => setClients(data || []));
     if (!isNew) { s.from("receptions").select("*").eq("id", id).single().then(async ({ data }) => {
       setR(data); if (data?.photos?.length) setUrls(await signedUrls(data.photos));
+      if (data?.intervention_id) { const { data: iv } = await s.from("interventions").select("billable, price_ht, invoice_id").eq("id", data.intervention_id).single();
+        if (iv?.billable) setIvBill(iv.price_ht ? `${Number(iv.price_ht).toLocaleString("fr-FR", { style: "currency", currency: "EUR" })} HT` : "à compléter");
+        if (iv?.invoice_id) setInvoiceId(iv.invoice_id); }
       if (data?.document_id) { const { data: inv } = await s.from("documents").select("id").eq("source_quote_id", data.document_id).eq("kind", "invoice").neq("status", "canceled").order("created_at", { ascending: false }).limit(1); if (inv?.[0]) setInvoiceId(inv[0].id); }
     }); return; }
     (async () => {
@@ -59,6 +63,7 @@ function Editor() {
             works: [iv.title, iv.notes].filter(Boolean).join("\n"), works_end_date: d, reception_date: addDays(0),
             company_signer: iv.technician || base.company_signer });
           docId = docId || iv.document_id;
+          setIvBill(iv.billable ? (iv.price_ht ? `${Number(iv.price_ht).toLocaleString("fr-FR", { style: "currency", currency: "EUR" })} HT` : "à compléter") : null);
         }
       }
       if (chId) {
@@ -158,8 +163,11 @@ function Editor() {
 
   // Réception sans réserve (ou réserves levées) → facture du devis + avenants signés
   async function makeInvoice(rec: Reception): Promise<string | null> {
-    if (!rec.document_id) return null;
-    const { data, error } = await sb().rpc("invoice_from_quote", { p_quote: rec.document_id, p_reception: rec.id });
+    if (!rec.document_id && !rec.intervention_id) return null;
+    const { data, error } = rec.intervention_id
+      ? await sb().rpc("invoice_from_intervention", { p_iv: rec.intervention_id, p_reception: rec.id })
+      : await sb().rpc("invoice_from_quote", { p_quote: rec.document_id, p_reception: rec.id });
+    if (!error && !data) return null;
     if (error) { setErr(`Facture non créée : ${error.message}`); return null; }
     setInvoiceId(data);
     return data as string;
@@ -287,7 +295,8 @@ function Editor() {
             <p className="text-xs text-slate-500">Signé par {r.signer_name}<br />le {new Date(r.signed_at!).toLocaleString("fr-FR")}</p>
           </section>
         )}
-        {editable && !r.document_id && <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-800">Aucun devis lié à ce quitus : la facture ne sera pas créée automatiquement après la signature.</p>}
+        {editable && !r.document_id && ivBill && <p className="rounded-xl bg-green-50 p-3 text-xs text-green-800">Intervention facturable ({ivBill}) : après signature, la facture sera créée automatiquement en brouillon.</p>}
+        {editable && !r.document_id && !ivBill && <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-800">Aucun devis lié à ce quitus : la facture ne sera pas créée automatiquement après la signature.</p>}
         {editable && r.document_id && <p className="rounded-xl bg-green-50 p-3 text-xs text-green-800">Après signature sans réserve, la facture du devis (avec ses avenants signés) sera créée automatiquement en brouillon.</p>}
         {invoiceId && isSup && <Link href={`/app/doc/${invoiceId}`} className="btn-brand w-full">💶 Voir la facture créée</Link>}
         {r.sent_at && <p className="text-xs text-green-700">📧 Envoyé le {new Date(r.sent_at).toLocaleString("fr-FR")} à {r.sent_to}</p>}

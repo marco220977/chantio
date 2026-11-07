@@ -392,3 +392,4 @@ alter table companies add column if not exists email_after_sign text not null de
 -- (voir migration "invoice_from_quote_fn" : facture brouillon depuis devis + avenants signés, appelée à la signature du quitus)
 -- interventions.sav_id (lien planning → fiche SAV)
 alter table interventions add column if not exists sav_id uuid references sav_tickets(id) on delete set null;
+-- interventions.billable/price_ht/vat_rate/invoice_id + fonction invoice_from_intervention (voir migration intervention_billable)

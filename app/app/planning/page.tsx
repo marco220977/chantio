@@ -2,12 +2,14 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { sb } from "@/lib/supabase";
+import { snapshotOf } from "@/lib/send";
 import Header from "@/components/Header";
 import Modal from "@/components/Modal";
 import type { Client } from "@/lib/types";
 import { memberName, useCompany } from "@/components/CompanyContext";
 
-type Iv = { id?: string; assigned_to?: string | null; title: string; client_id?: string | null; document_id?: string | null; address?: string; starts_at: string; duration_min: number; technician?: string; status: string; notes?: string; clients?: { name: string; phone?: string } | null };
+type Iv = { id?: string; assigned_to?: string | null; title: string; client_id?: string | null; document_id?: string | null; address?: string; starts_at: string; duration_min: number; technician?: string; status: string; notes?: string; clients?: { name: string; phone?: string } | null;
+  sav_id?: string | null; billable?: boolean; price_ht?: number | null; vat_rate?: number; invoice_id?: string | null; _kind?: "intervention" | "sav" };
 
 const startOfWeek = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
 const localInput = (iso: string) => { const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
@@ -50,7 +52,9 @@ function Planning() {
 
   async function save(over?: Partial<Iv>) {
     if (!edit) return;
-    const { id, clients: _c, ...row } = { ...edit, ...over };
+    const { id, clients: _c, _kind, ...row } = { ...edit, ...over };
+    if (!id && _kind === "sav") return createSav(row);
+    if (!row.billable) { row.price_ht = null; }
     const wasDone = id ? list.find((x) => x.id === id)?.status === "done" : false;
     const { data: saved } = id ? await sb().from("interventions").update(row).eq("id", id).select().single() : await sb().from("interventions").insert(row).select().single();
     setEdit(null);
@@ -59,6 +63,21 @@ function Planning() {
       return;
     }
     load();
+  }
+  // Nouveau SAV depuis le planning : fiche SAV numérotée + intervention liée
+  async function createSav(row: any) {
+    if (!row.client_id) return alert("Choisissez le client.");
+    const s = sb();
+    const { data: num, error: e1 } = await s.rpc("next_number", { p_kind: "S" });
+    if (e1) return alert(e1.message);
+    const c = clients.find((x) => x.id === row.client_id);
+    const { data: t, error } = await s.from("sav_tickets").insert({ number: num, status: "planned", client_id: row.client_id, client_snapshot: snapshotOf(c),
+      address: row.address || null, problem: [row.title, row.notes].filter(Boolean).join(" — ") || null, scheduled_at: row.starts_at,
+      technician: row.technician || null, assigned_to: row.assigned_to || null, billable: !!row.billable }).select().single();
+    if (error) return alert(error.message);
+    await s.from("interventions").insert({ sav_id: t.id, title: `SAV ${num}${row.title ? " — " + row.title : ""}`, client_id: row.client_id, address: row.address || null,
+      starts_at: row.starts_at, duration_min: row.duration_min, technician: row.technician || null, assigned_to: row.assigned_to || null, notes: row.notes || null, status: "planned" });
+    setEdit(null); load();
   }
   async function del() { if (edit?.id && confirm("Supprimer ?")) { await sb().from("interventions").delete().eq("id", edit.id); setEdit(null); load(); } }
 
@@ -97,11 +116,11 @@ function Planning() {
               {items.length === 0 && <p className="text-xs text-slate-400">—</p>}
               {items.map((i) => (
                 <div key={i.id} className={`card mb-2 flex w-full items-stretch gap-2 border-l-4 !p-0 ${i.status === "done" ? "border-l-green-500 opacity-70" : i.status === "canceled" ? "border-l-red-400 opacity-50" : "border-l-flame"}`}>
-                  <button className="flex-1 p-4 text-left" onClick={() => router.push((i as any).sav_id ? `/app/sav/${(i as any).sav_id}` : `/app/quitus/nouveau?intervention=${i.id}`)}>
+                  <button className="flex-1 p-4 text-left" onClick={() => router.push(i.sav_id ? `/app/sav/${i.sav_id}` : `/app/quitus/nouveau?intervention=${i.id}`)}>
                     <p className="font-semibold">{new Date(i.starts_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · {i.title}</p>
                     <p className="text-sm text-slate-500">{[i.clients?.name, i.address].filter(Boolean).join(" · ")}</p>
-                    <p className="text-xs font-semibold text-brand">{(i as any).sav_id ? "🛠 Ouvrir la fiche SAV →" : i.id && quitus[i.id] ? (quitus[i.id].status === "draft" ? "📝 Quitus à signer →" : "✅ Quitus signé →") : "📝 Quitus d'intervention →"}</p>
-                    <p className="text-xs text-slate-400">👷 {i.technician || "Non attribué"}</p>
+                    <p className="text-xs font-semibold text-brand">{i.sav_id ? "🛠 Ouvrir la fiche SAV →" : i.id && quitus[i.id] ? (quitus[i.id].status === "draft" ? "📝 Quitus à signer →" : "✅ Quitus signé →") : "📝 Quitus d'intervention →"}</p>
+                    <p className="text-xs text-slate-400">👷 {i.technician || "Non attribué"}{i.billable ? ` · 💶 ${i.price_ht ? Number(i.price_ht).toLocaleString("fr-FR", { style: "currency", currency: "EUR" }) + " HT" : "facturable"}` : ""}{i.invoice_id ? " · facturée" : ""}</p>
                   </button>
                   <button className="border-l border-slate-100 px-4 text-xl text-slate-400" aria-label="Modifier l'intervention" onClick={() => setEdit(i)}>✏️</button>
                 </div>
@@ -111,9 +130,16 @@ function Planning() {
         })}
       </div>
       {edit && (
-        <Modal title={edit.id ? "Intervention" : "Nouvelle intervention"} onClose={() => setEdit(null)}>
+        <Modal title={edit.id ? "Intervention" : edit._kind === "sav" ? "Nouveau SAV" : "Nouvelle intervention"} onClose={() => setEdit(null)}>
           <div className="space-y-3">
-            <input className="input" placeholder="Intitulé (ex : Entretien chaudière)" value={edit.title} onChange={(e) => setEdit({ ...edit, title: e.target.value })} />
+            {!edit.id && (
+              <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-200 p-1">
+                {([["intervention", "🔧 Intervention"], ["sav", "🛠 SAV"]] as const).map(([k, l]) => (
+                  <button key={k} onClick={() => setEdit({ ...edit, _kind: k })} className={`rounded-lg py-2 text-sm font-semibold ${(edit._kind || "intervention") === k ? "bg-white shadow" : "text-slate-600"}`}>{l}</button>
+                ))}
+              </div>
+            )}
+            <input className="input" placeholder={edit._kind === "sav" ? "Appareil / panne (ex : Chaudière en défaut F28)" : "Intitulé (ex : Remplacement mitigeur)"} value={edit.title} onChange={(e) => setEdit({ ...edit, title: e.target.value })} />
             <select className="input" value={edit.client_id || ""} onChange={(e) => {
               const c = clients.find((x) => x.id === e.target.value);
               setEdit({ ...edit, client_id: e.target.value || null, address: edit.address || (c ? [c.address, c.zip, c.city].filter(Boolean).join(" ") : "") });
@@ -133,13 +159,31 @@ function Planning() {
                 <option value="">— Non attribué —</option>
                 {team.map((m) => <option key={m.user_id} value={m.user_id}>{memberName(m)}{m.role === "technician" ? " (technicien)" : ""}</option>)}
               </select></div>
-            <textarea className="input" rows={2} placeholder="Notes" value={edit.notes || ""} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} />
+            <textarea className="input" rows={2} placeholder={edit._kind === "sav" ? "Problème signalé par le client" : "Notes"} value={edit.notes || ""} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} />
+            {!edit.sav_id && (
+              <div className="rounded-xl border border-slate-200 p-3 space-y-2">
+                <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={!!edit.billable} onChange={(e) => setEdit({ ...edit, billable: e.target.checked })} /> 💶 Intervention facturable</label>
+                {edit.billable && edit._kind !== "sav" && (
+                  <>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input className="input" inputMode="decimal" placeholder="Montant HT (€)" value={edit.price_ht ?? ""} onChange={(e) => setEdit({ ...edit, price_ht: e.target.value === "" ? null : Number(e.target.value.replace(",", ".")) })} />
+                      <select className="input" value={edit.vat_rate ?? 10} onChange={(e) => setEdit({ ...edit, vat_rate: Number(e.target.value) })}>
+                        <option value={20}>TVA 20 %</option><option value={10}>TVA 10 %</option><option value={5.5}>TVA 5,5 %</option>
+                      </select>
+                    </div>
+                    <p className="text-xs text-slate-500">{edit.document_id ? "Lié à un devis : la facture reprendra le devis." : "À la signature du quitus, une facture brouillon est créée automatiquement avec ce montant."}</p>
+                  </>
+                )}
+                {edit.billable && edit._kind === "sav" && <p className="text-xs text-slate-500">SAV hors garantie : vous pourrez le facturer depuis la fiche SAV.</p>}
+                {edit.invoice_id && isSup && <button className="btn-ghost w-full text-sm" onClick={() => router.push(`/app/doc/${edit.invoice_id}`)}>💶 Voir la facture</button>}
+              </div>
+            )}
             <select className="input" value={edit.status} onChange={(e) => { setEdit({ ...edit, status: e.target.value }); if (e.target.value === "done" && edit.id && edit.title) save({ status: "done" }); }}>
               <option value="planned">Prévue</option><option value="done">Terminée</option><option value="canceled">Annulée</option>
             </select>
-            {edit.id && quitus[edit.id] && <button className="btn-ghost w-full" onClick={() => router.push(`/app/quitus/${quitus[edit.id!].id}`)}>{quitus[edit.id].status === "draft" ? "📝 Faire signer le quitus" : "✅ Voir le quitus signé"}</button>}
+            {edit._kind !== "sav" && edit.id && quitus[edit.id] && <button className="btn-ghost w-full" onClick={() => router.push(`/app/quitus/${quitus[edit.id!].id}`)}>{quitus[edit.id].status === "draft" ? "📝 Faire signer le quitus" : "✅ Voir le quitus signé"}</button>}
             {edit.id && !quitus[edit.id] && edit.status === "done" && <button className="btn-ghost w-full" onClick={() => router.push(`/app/quitus/nouveau?intervention=${edit.id}`)}>📝 Quitus d'intervention</button>}
-            {edit.status === "done" && !(edit.id && quitus[edit.id]) && <p className="text-xs text-slate-500">« Terminée » enregistre l'intervention et ouvre le quitus pré-rempli pour la signature du client.</p>}
+            {edit._kind !== "sav" && edit.status === "done" && !(edit.id && quitus[edit.id]) && <p className="text-xs text-slate-500">« Terminée » enregistre l'intervention et ouvre le quitus pré-rempli pour la signature du client.</p>}
             {edit.address && <a className="btn-ghost w-full" target="_blank" rel="noreferrer" href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(edit.address)}`}>🧭 Itinéraire</a>}
             <button className="btn-primary w-full" onClick={() => save()}>Enregistrer</button>
             {edit.id && <button className="btn-danger w-full" onClick={del}>Supprimer</button>}
