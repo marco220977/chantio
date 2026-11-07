@@ -222,7 +222,7 @@ function Editor() {
             </div>
           )}
           {upl && <p className="text-sm text-slate-500">{upl}</p>}
-          {canPhoto && <p className="text-xs text-slate-400">Les photos sont ajoutées au procès-verbal PDF (8 maximum).</p>}
+          {canPhoto && <p className="text-xs text-slate-400">Toutes les photos sont ajoutées au procès-verbal PDF.</p>}
         </section>
 
         <section className="card space-y-3">

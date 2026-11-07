@@ -55,7 +55,7 @@ export function warrantyFromReception(receptionDate?: string): string {
 }
 
 // ---------------- PV DE RÉCEPTION / QUITUS ----------------
-async function photosBlock(pdf: jsPDF, y: number, paths: string[], urls: Record<string, string>, max = 8) {
+async function photosBlock(pdf: jsPDF, y: number, paths: string[], urls: Record<string, string>, max = Infinity) {
   const M = 15;
   const list = paths.filter((p) => urls[p]).slice(0, max);
   if (!list.length) return y;
@@ -132,18 +132,7 @@ export async function buildSavPdf(t: Ticket, company: Company, photoUrls: Record
   if (t.parts) y = paragraph(pdf, y, "Pièces remplacées / fournies", t.parts);
   if (t.resolved_at) y = paragraph(pdf, y, "Résolution", `Intervention terminée le ${dateFr(t.resolved_at)}.`);
 
-  const photos = t.photos.filter((p) => photoUrls[p]).slice(0, 4);
-  if (photos.length) {
-    if (y + 50 > 280) { pdf.addPage(); y = M; }
-    pdf.setFont("helvetica", "bold").setFontSize(9.5).text("Photos", M, y); y += 3;
-    let x = M;
-    for (const p of photos) {
-      const img = await toDataUrl(photoUrls[p]); if (!img) continue;
-      const pr = pdf.getImageProperties(img); const h = 40, w = Math.min(42, (pr.width / pr.height) * h);
-      pdf.addImage(img, "JPEG", x, y, w, h); x += 45;
-    }
-    y += 45;
-  }
+  y = await photosBlock(pdf, y, t.photos, photoUrls);
   signatures(pdf, y + 2, company, "Le client — intervention constatée", { name: t.signer_name, data: t.signature_data, at: t.signed_at }, t.technician);
   footer(pdf, company);
   return pdf;

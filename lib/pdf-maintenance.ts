@@ -27,10 +27,12 @@ export async function header(pdf: jsPDF, company: Company, title: string, number
 }
 
 export function box(pdf: jsPDF, x: number, y: number, w: number, title: string, lines: string[]) {
-  const h = 9 + lines.length * 4.2;
+  pdf.setFont("helvetica", "normal").setFontSize(9);
+  const wrapped: string[] = lines.flatMap((l) => pdf.splitTextToSize(String(l), w - 6) as string[]);
+  const h = 9 + wrapped.length * 4.2;
   pdf.setDrawColor(220).setFillColor(247, 248, 250).roundedRect(x, y, w, h, 2, 2, "FD");
   pdf.setFont("helvetica", "bold").setFontSize(8).setTextColor(100).text(title.toUpperCase(), x + 3, y + 5);
-  pdf.setFont("helvetica", "normal").setFontSize(9).setTextColor(0).text(lines, x + 3, y + 10);
+  pdf.setFont("helvetica", "normal").setFontSize(9).setTextColor(0).text(wrapped, x + 3, y + 10);
   return h;
 }
 
