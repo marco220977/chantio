@@ -42,4 +42,8 @@ export type SiretInfo = {
   found: boolean; siren: string; siret?: string; name?: string; legal_form?: string; vat_number?: string;
   address?: string; zip?: string; city?: string; naf?: string; naf_btp?: boolean; active?: boolean;
   establishment_known?: boolean; created?: string;
+  // Fiche détaillée (équivalent Kbis)
+  activity_label?: string; head_office?: string; directors?: { name: string; role?: string }[];
+  category?: string; employees?: string; closed_on?: string | null; rcs?: boolean;
+  procedures?: { date: string; type: string; court?: string }[] | null;
 };

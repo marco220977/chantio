@@ -32,7 +32,27 @@ export async function GET(req: Request) {
       active: ent.etat_administratif === "A" && (!etab || etab.etat_administratif !== "F"),
       establishment_known: !c.siret || !!etab,
       created: ent.date_creation,
+      activity_label: src.libelle_activite_principale || ent.libelle_activite_principale || undefined,
+      head_office: siege.adresse || undefined,
+      directors: (ent.dirigeants || []).slice(0, 6).map((d: any) => ({
+        name: d.denomination || [d.prenoms, d.nom].filter(Boolean).join(" "), role: d.qualite || undefined })),
+      category: ent.categorie_entreprise || undefined,
+      employees: ent.tranche_effectif_salarie || undefined,
+      closed_on: ent.date_fermeture || null,
+      rcs: !!(ent.complements?.est_rcs ?? ent.complements?.est_societe_commerciale),
+      procedures: null,
     };
+    // Procédures collectives publiées au BODACC (redressement, liquidation, sauvegarde)
+    if (new URL(req.url).searchParams.get("full")) {
+      try {
+        const b = await fetch(`https://bodacc-datadila.opendatasoft.com/api/explore/v2.1/catalog/datasets/annonces-commerciales/records?where=${encodeURIComponent(`"${siren}"`)}&refine=familleavis%3Acollective&order_by=dateparution%20desc&limit=5`, { cache: "no-store" });
+        if (b.ok) {
+          const bj = await b.json();
+          info.procedures = (bj.results || []).filter((x: any) => String(x.registre || "").replace(/\s/g, "").includes(siren))
+            .map((x: any) => ({ date: x.dateparution, type: x.familleavis_lib || "Procédure collective", court: x.tribunal || undefined }));
+        }
+      } catch {}
+    }
     return NextResponse.json(info);
   } catch {
     return NextResponse.json({ error: "Registre des entreprises injoignable, réessayez plus tard." }, { status: 503 });

@@ -7,6 +7,7 @@ import Modal from "@/components/Modal";
 import type { Client } from "@/lib/types";
 import { useCompany } from "@/components/CompanyContext";
 import SiretField from "@/components/SiretField";
+import KbisCard from "@/components/KbisCard";
 
 export default function Clients() {
   const [list, setList] = useState<Client[]>([]);
@@ -67,6 +68,7 @@ export default function Clients() {
                 onVerified={(i) => setEdit({ ...edit, siret: i.siret || edit.siret, siret_verified_at: new Date().toISOString(),
                   name: edit.name || i.name, address: edit.address || i.address, zip: edit.zip || i.zip, city: edit.city || i.city })} />
             )}
+            {edit.type === "professionnel" && edit.siret && <KbisCard key={edit.siret} siret={edit.siret} />}
             <textarea className="input" rows={2} placeholder="Notes (code portail, matériel en place…)" value={edit.notes || ""} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} />
             <button className="btn-primary w-full" onClick={save}>Enregistrer</button>
             {edit.id && <button className="btn-danger w-full" onClick={del}>Supprimer</button>}
