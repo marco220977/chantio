@@ -1,12 +1,12 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { checkSiret, type SiretInfo } from "@/lib/siret";
 
 const d = (s?: string | null) => (s ? new Date(s).toLocaleDateString("fr-FR") : "—");
 const EFF: Record<string, string> = { NN: "non renseigné", "00": "0 salarié", "01": "1-2", "02": "3-5", "03": "6-9", "11": "10-19", "12": "20-49", "21": "50-99", "22": "100-199", "31": "200-249", "32": "250-499", "41": "500-999", "42": "1 000-1 999" };
 
 // Vérification d'une entreprise cliente : équivalent des informations du Kbis (registres officiels)
-export default function KbisCard({ siret }: { siret: string }) {
+export default function KbisCard({ siret, onLoaded }: { siret: string; onLoaded?: (i: SiretInfo) => void }) {
   const [info, setInfo] = useState<(SiretInfo & { error?: string }) | null>(null);
   const [busy, setBusy] = useState(false);
   const c = checkSiret(siret || "");
@@ -14,10 +14,15 @@ export default function KbisCard({ siret }: { siret: string }) {
 
   async function load() {
     setBusy(true);
-    try { const r = await fetch(`/api/siret?q=${c.siret || siren}&full=1`); setInfo(await r.json()); }
+    try {
+      const r = await fetch(`/api/siret?q=${c.siret || siren}&full=1`); const j = await r.json(); setInfo(j);
+      if (j.found) onLoaded?.(j);
+    }
     catch { setInfo({ found: false, siren, error: "Vérification impossible (connexion)." }); }
     setBusy(false);
   }
+  // Lancement automatique dès qu'un SIRET valide est saisi
+  useEffect(() => { if (c.ok && !info && !busy) load(); }, [siret]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!c.ok) return null;
   if (!info) return <button type="button" className="btn-ghost w-full" disabled={busy} onClick={load}>{busy ? "Interrogation des registres…" : "📄 Vérifier l'entreprise (infos Kbis)"}</button>;
   if (info.error || !info.found) return <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-900">⚠️ {info.error || "Entreprise introuvable au registre."}</p>;

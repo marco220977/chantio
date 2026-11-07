@@ -68,7 +68,8 @@ export default function Clients() {
                 onVerified={(i) => setEdit({ ...edit, siret: i.siret || edit.siret, siret_verified_at: new Date().toISOString(),
                   name: edit.name || i.name, address: edit.address || i.address, zip: edit.zip || i.zip, city: edit.city || i.city })} />
             )}
-            {edit.type === "professionnel" && edit.siret && <KbisCard key={edit.siret} siret={edit.siret} />}
+            {edit.type === "professionnel" && edit.siret && <KbisCard key={edit.siret} siret={edit.siret} onLoaded={(i) => setEdit((e: any) => e && ({ ...e, siret: i.siret || e.siret, siret_verified_at: i.active ? new Date().toISOString() : e.siret_verified_at,
+              name: e.name || i.name, address: e.address || i.address, zip: e.zip || i.zip, city: e.city || i.city }))} />}
             <textarea className="input" rows={2} placeholder="Notes (code portail, matériel en place…)" value={edit.notes || ""} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} />
             <button className="btn-primary w-full" onClick={save}>Enregistrer</button>
             {edit.id && <button className="btn-danger w-full" onClick={del}>Supprimer</button>}
