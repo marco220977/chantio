@@ -8,6 +8,9 @@ const features = [
   ["📷", "Scan de plaque chaudière", "Une photo et la marque, le modèle et la puissance sont reconnus."],
   ["📄", "PDF conformes", "Mentions obligatoires, TVA 5,5 / 10 / 20 %, assurance décennale, pénalités."],
   ["🗓️", "Planning", "Vos interventions et celles de votre équipe, jour par jour."],
+  ["🧾", "Facture électronique 2026", "Factures au format Factur-X transmises à la plateforme agréée, prêt pour l'obligation légale."],
+  ["✨", "Devis par IA", "Dictez le chantier, les lignes du devis sont rédigées avec vos prix."],
+  ["💳", "Paiement en ligne", "Vos clients paient factures et acomptes par carte, relances automatiques."],
   ["📚", "Catalogue", "Vos prestations et fournitures avec prix d'achat pour suivre la marge."],
 ];
 

@@ -55,7 +55,7 @@ export default function Abonnement() {
           <div className="card space-y-3 text-center">
             <p className="text-4xl font-extrabold">29 €<span className="text-base font-medium text-slate-500"> HT/mois</span></p>
             <ul className="space-y-1 text-left text-sm">
-              {["Devis et factures illimités", "Signature électronique sur place et à distance", "Contrats et attestations d'entretien", "Suivi de chantier, quitus et SAV", "Scan de plaque chaudière", "Export comptable"].map((x) => <li key={x}>✅ {x}</li>)}
+              {["Devis et factures illimités", "Signature électronique sur place et à distance", "Contrats et attestations d'entretien", "Suivi de chantier, quitus et SAV", "Facture électronique 2026 (Factur-X, transmission à la plateforme agréée)", "Paiement en ligne des factures et acomptes", "Relances automatiques et rappels SMS", "Devis par IA (dictée vocale)", "Factures de situation, aides MaPrimeRénov'/CEE", "Bons de commande fournisseurs", "Mode hors ligne", "Scan de plaque chaudière", "Export comptable"].map((x) => <li key={x}>✅ {x}</li>)}
             </ul>
             <p className="text-xs text-slate-500">Sans engagement, résiliable à tout moment. <a href="/legal/cgv" className="text-brand underline">Conditions générales</a></p>
             <button className="btn-brand w-full py-3.5" disabled={busy} onClick={() => call("/api/stripe/checkout")}>{busy ? "…" : "S'abonner"}</button>
