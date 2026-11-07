@@ -17,7 +17,13 @@ export default function Clients() {
   const { isSup } = useCompany();
 
   const load = () => sb().from("clients").select("*").order("name").then(({ data }) => setList(data || []));
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    sb().from("clients").select("*").order("name").then(({ data }) => {
+      setList(data || []);
+      const e = new URLSearchParams(location.search).get("edit");
+      if (e) { const c = (data || []).find((x: Client) => x.id === e); if (c) setEdit(c); }
+    });
+  }, []);
 
   async function save() {
     if (!edit?.name) return;
@@ -43,10 +49,11 @@ export default function Clients() {
         <input className="input" placeholder="Rechercher…" value={q} onChange={(e) => setQ(e.target.value)} />
         {list.filter((c) => !q || `${c.name} ${c.city} ${c.phone}`.toLowerCase().includes(q.toLowerCase())).map((c) => (
           <div key={c.id} className="card flex items-center gap-3">
-            <button className="min-w-0 flex-1 text-left" onClick={() => setEdit(c)}>
+            <Link href={`/app/clients/${c.id}`} className="min-w-0 flex-1 text-left">
               <p className="truncate font-semibold">{c.name}</p>
               <p className="truncate text-sm text-slate-500">{[c.city, c.phone].filter(Boolean).join(" · ")}</p>
-            </button>
+            </Link>
+            <button className="text-lg text-slate-400" aria-label="Modifier" onClick={() => setEdit(c)}>✏️</button>
             {c.phone && <a href={`tel:${c.phone}`} className="text-xl">📞</a>}
             {isSup ? <Link href={`/app/doc/nouveau?kind=quote&client=${c.id}`} className="chip bg-flame-light py-1.5 text-flame">Devis</Link>
               : <Link href={`/app/sav/nouveau?client=${c.id}`} className="chip bg-flame-light py-1.5 text-flame">SAV</Link>}
