@@ -38,6 +38,20 @@ function Editor() {
       const base: Reception = { id: "", status: "draft", reserves: [], reception_date: addDays(0), works_end_date: addDays(0), company_signer: me?.full_name || "" };
       let docId = params.get("doc");
       const chId = params.get("chantier");
+      const ivId = params.get("intervention");
+      if (ivId) {
+        const { data: iv } = await s.from("interventions").select("*").eq("id", ivId).single();
+        if (iv) {
+          const day = new Date(iv.starts_at); day.setMinutes(day.getMinutes() - day.getTimezoneOffset());
+          const d = day.toISOString().slice(0, 10);
+          let snap: any = null;
+          if (iv.client_id) { const { data: c } = await s.from("clients").select("*").eq("id", iv.client_id).single(); snap = snapshotOf(c); }
+          Object.assign(base, { intervention_id: iv.id, client_id: iv.client_id, client_snapshot: snap, address: iv.address,
+            works: [iv.title, iv.notes].filter(Boolean).join("\n"), works_end_date: d, reception_date: addDays(0),
+            company_signer: iv.technician || base.company_signer });
+          docId = docId || iv.document_id;
+        }
+      }
       if (chId) {
         const { data: ch } = await s.from("chantiers").select("*").eq("id", chId).single();
         if (ch) { Object.assign(base, { chantier_id: ch.id, client_id: ch.client_id, client_snapshot: ch.client_snapshot, address: ch.address, works: ch.title }); docId = docId || ch.document_id; }
@@ -65,7 +79,7 @@ function Editor() {
     const cur = { ...r!, ...extra };
     const { id: _i, created_at, ...rest } = cur as any;
     const payload: any = { ...rest, client_snapshot: snapshotOf(client) || cur.client_snapshot || null, client_id: cur.client_id || null,
-      chantier_id: cur.chantier_id || null, document_id: cur.document_id || null, reserves: cur.with_reserves ? cur.reserves.filter((x) => x.label.trim()) : [] };
+      chantier_id: cur.chantier_id || null, document_id: cur.document_id || null, intervention_id: cur.intervention_id || null, reserves: cur.with_reserves ? cur.reserves.filter((x) => x.label.trim()) : [] };
     if (!cur.id) {
       const { data: num, error } = await sb().rpc("next_number", { p_kind: "Q" });
       if (error) { setErr(error.message); setBusy(false); return null; }

@@ -1,6 +1,6 @@
 "use client";
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { sb } from "@/lib/supabase";
 import Header from "@/components/Header";
 import Modal from "@/components/Modal";
@@ -14,6 +14,8 @@ const localInput = (iso: string) => { const d = new Date(iso); d.setMinutes(d.ge
 
 function Planning() {
   const params = useSearchParams();
+  const router = useRouter();
+  const [quitus, setQuitus] = useState<Record<string, { id: string; status: string }>>({});
   const [week, setWeek] = useState(startOfWeek(new Date()));
   const [list, setList] = useState<Iv[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -27,6 +29,11 @@ function Planning() {
     const { data } = await sb().from("interventions").select("*, clients(name, phone)")
       .gte("starts_at", week.toISOString()).lt("starts_at", end.toISOString()).order("starts_at");
     setList(data || []);
+    const ids = (data || []).map((i: Iv) => i.id);
+    if (ids.length) {
+      const { data: rs } = await sb().from("receptions").select("id, status, intervention_id").in("intervention_id", ids);
+      setQuitus(Object.fromEntries((rs || []).map((r: any) => [r.intervention_id, { id: r.id, status: r.status }])));
+    }
   };
   useEffect(() => { load(); }, [week]);
   useEffect(() => {
@@ -44,8 +51,14 @@ function Planning() {
   async function save() {
     if (!edit) return;
     const { id, clients: _c, ...row } = edit;
-    id ? await sb().from("interventions").update(row).eq("id", id) : await sb().from("interventions").insert(row);
-    setEdit(null); load();
+    const wasDone = id ? list.find((x) => x.id === id)?.status === "done" : false;
+    const { data: saved } = id ? await sb().from("interventions").update(row).eq("id", id).select().single() : await sb().from("interventions").insert(row).select().single();
+    setEdit(null);
+    if (saved && row.status === "done" && !wasDone && !quitus[saved.id]) {
+      router.push(`/app/quitus/nouveau?intervention=${saved.id}`);
+      return;
+    }
+    load();
   }
   async function del() { if (edit?.id && confirm("Supprimer ?")) { await sb().from("interventions").delete().eq("id", edit.id); setEdit(null); load(); } }
 
@@ -86,7 +99,7 @@ function Planning() {
                 <button key={i.id} onClick={() => setEdit(i)} className={`card mb-2 block w-full border-l-4 text-left ${i.status === "done" ? "border-l-green-500 opacity-60" : i.status === "canceled" ? "border-l-red-400 opacity-50" : "border-l-flame"}`}>
                   <p className="font-semibold">{new Date(i.starts_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · {i.title}</p>
                   <p className="text-sm text-slate-500">{[i.clients?.name, i.address].filter(Boolean).join(" · ")}</p>
-                  <p className="text-xs text-slate-400">👷 {i.technician || "Non attribué"}</p>
+                  <p className="text-xs text-slate-400">👷 {i.technician || "Non attribué"}{i.id && quitus[i.id] ? (quitus[i.id].status === "draft" ? " · 📝 quitus à signer" : " · ✅ quitus signé") : ""}</p>
                 </button>
               ))}
             </div>
@@ -120,6 +133,9 @@ function Planning() {
             <select className="input" value={edit.status} onChange={(e) => setEdit({ ...edit, status: e.target.value })}>
               <option value="planned">Prévue</option><option value="done">Terminée</option><option value="canceled">Annulée</option>
             </select>
+            {edit.id && quitus[edit.id] && <button className="btn-ghost w-full" onClick={() => router.push(`/app/quitus/${quitus[edit.id!].id}`)}>{quitus[edit.id].status === "draft" ? "📝 Faire signer le quitus" : "✅ Voir le quitus signé"}</button>}
+            {edit.id && !quitus[edit.id] && edit.status === "done" && <button className="btn-ghost w-full" onClick={() => router.push(`/app/quitus/nouveau?intervention=${edit.id}`)}>📝 Quitus d'intervention</button>}
+            {edit.status === "done" && !(edit.id && quitus[edit.id]) && <p className="text-xs text-slate-500">En enregistrant « Terminée », le quitus d'intervention s'ouvre pré-rempli pour la signature du client.</p>}
             {edit.address && <a className="btn-ghost w-full" target="_blank" rel="noreferrer" href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(edit.address)}`}>🧭 Itinéraire</a>}
             <button className="btn-primary w-full" onClick={save}>Enregistrer</button>
             {edit.id && <button className="btn-danger w-full" onClick={del}>Supprimer</button>}
