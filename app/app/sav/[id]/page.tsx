@@ -219,12 +219,16 @@ function Editor() {
                     {!closed && <button className="absolute right-0.5 top-0.5 rounded-full bg-black/60 px-1.5 text-xs text-white" onClick={() => removePhoto(p)}>×</button>}
                   </div>
                 ))}
-                {!closed && (
-                  <label className="flex aspect-square cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-slate-300 text-2xl">
-                    📷<input type="file" accept="image/*" multiple className="hidden" onChange={(e) => e.target.files && addPhotos(e.target.files)} />
-                  </label>
-                )}
               </div>
+              {!closed && (
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <label className="btn-ghost cursor-pointer">📷 Prendre une photo
+                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { if (e.target.files?.length) addPhotos(e.target.files); e.target.value = ""; }} /></label>
+                  <label className="btn-ghost cursor-pointer">🖼 Galerie
+                    <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { if (e.target.files?.length) addPhotos(e.target.files); e.target.value = ""; }} /></label>
+                </div>
+              )}
+              {busy && <p className="mt-1 text-sm text-slate-500">{busy}</p>}
             </div>
           </section>
         )}
