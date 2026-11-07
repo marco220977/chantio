@@ -1,5 +1,6 @@
 "use client";
 import { sb } from "./supabase";
+import { stampPhoto } from "./stamp";
 
 export type Chantier = {
   id: string; title: string; status: string; client_id?: string | null; client_snapshot?: any; document_id?: string | null;
@@ -30,7 +31,7 @@ export async function compressPhoto(file: File, max = 1600): Promise<Blob> {
 }
 
 export async function uploadPhoto(companyId: string, chantierId: string, file: File): Promise<string> {
-  const blob = await compressPhoto(file);
+  const blob = await stampPhoto(file);
   const path = `${companyId}/${chantierId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
   const { error } = await sb().storage.from("chantiers").upload(path, blob, { contentType: "image/jpeg" });
   if (error) throw error;

@@ -1,12 +1,11 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 
+import { stampPhoto } from "@/lib/stamp";
+
 async function compress(file: File): Promise<string> {
-  const img = await createImageBitmap(file);
-  const max = 640, k = Math.min(1, max / Math.max(img.width, img.height));
-  const c = document.createElement("canvas"); c.width = img.width * k; c.height = img.height * k;
-  c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
-  return c.toDataURL("image/jpeg", 0.7);
+  const blob = await stampPhoto(file, 640);
+  return new Promise((ok) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.readAsDataURL(blob); });
 }
 
 const QUOTE_AGREEMENT = "« Bon pour accord » — j'accepte ce devis et ses conditions, et je certifie l'exactitude des informations relatives au logement (TVA à taux réduit le cas échéant).";
