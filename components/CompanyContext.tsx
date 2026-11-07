@@ -18,10 +18,12 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
   const reload = useCallback(async () => {
     const s = sb();
     const user = await currentUser();
-    const [{ data: co }, { data: ms }] = await Promise.all([
+    const [{ data: co, error: e1 }, { data: ms, error: e2 }] = await Promise.all([
       s.from("companies").select("*").maybeSingle(),
       s.from("members").select("user_id, company_id, role, full_name, email").order("created_at"),
     ]);
+    // Réseau coupé ou erreur : on garde l'état précédent au lieu d'afficher « accès retiré »
+    if (e1 || e2 || !user) { setLoaded(true); return; }
     setCompany(co);
     setTeam(ms || []);
     setMe((ms || []).find((m: Member) => m.user_id === user?.id) || null);

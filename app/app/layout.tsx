@@ -39,7 +39,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { me, isSup, loaded } = useCompany();
 
-  if (loaded && !me) {
+  if (loaded && !me && typeof navigator !== "undefined" && navigator.onLine) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
         <p className="text-lg font-bold">Votre accès à cette entreprise a été retiré.</p>
