@@ -271,6 +271,10 @@ function Editor() {
         {r.sent_at && <p className="text-xs text-green-700">📧 Envoyé le {new Date(r.sent_at).toLocaleString("fr-FR")} à {r.sent_to}</p>}
 
         <section className="space-y-2">
+          <div className={`grid gap-2 ${r.id ? "grid-cols-2" : "grid-cols-1"}`}>
+            <button className="btn-ghost" onClick={() => setPreview(() => () => buildReceptionPdf({ ...r, client_snapshot: snapshotOf(client) || r.client_snapshot }, company, urls))}>👁 Aperçu PDF</button>
+            {r.id && <button className="btn-ghost" onClick={async () => shareOrSave(await buildReceptionPdf(r, company, urls), `${r.number}.pdf`)}>📤 Partager</button>}
+          </div>
           {editable && <button className="btn-primary w-full py-3.5" disabled={busy} onClick={() => save()}>💾 Enregistrer</button>}
           {editable && <button className="btn-brand w-full py-3.5" disabled={busy} onClick={async () => {
             if (!r.client_id && !r.client_snapshot) return setErr("Choisissez un client.");
@@ -278,12 +282,7 @@ function Editor() {
             if (r.with_reserves && !r.reserves.some((x) => x.label.trim())) return setErr("Ajoutez au moins une réserve, ou choisissez « Sans réserve ».");
             if (await save()) setModal("sign");
           }}>✍️ Faire signer le quitus</button>}
-          {r.id && (
-            <div className="grid grid-cols-2 gap-2">
-              <button className="btn-ghost" onClick={() => setPreview(() => () => buildReceptionPdf(r, company, urls))}>👁 Aperçu</button>
-              <button className="btn-ghost" onClick={async () => shareOrSave(await buildReceptionPdf(r, company, urls), `${r.number}.pdf`)}>📤 Partager</button>
-            </div>
-          )}
+
           {r.status === "signed" && <button className="btn-primary w-full" disabled={busy} onClick={send}>📧 {r.sent_at ? "Renvoyer" : "Envoyer"} par e-mail</button>}
           {r.status === "signed" && <Link href={`/app/sav/nouveau?client=${r.client_id || ""}&reception=${r.id}`} className="btn-ghost w-full">🛠 Ouvrir un SAV pour ce client</Link>}
           {editable && r.id && <button className="btn-danger w-full" onClick={async () => { if (confirm("Supprimer ce brouillon ?")) { await sb().from("receptions").delete().eq("id", r.id); router.replace("/app/quitus"); } }}>Supprimer le brouillon</button>}
