@@ -13,7 +13,7 @@ export default function AutomationSettings({ company, reload }: { company: Compa
   useEffect(() => {
     setF({ auto_reminders: co.auto_reminders !== false, reminder_days: (co.reminder_days || [1, 15, 30]).join(", "), quote_followup_days: co.quote_followup_days ?? 7,
       appointment_reminders: co.appointment_reminders !== false, sms_enabled: !!co.sms_enabled, sms_sender: co.sms_sender || "",
-      maintenance_reminders: co.maintenance_reminders !== false, review_requests: !!co.review_requests, google_review_url: co.google_review_url || "" });
+      maintenance_reminders: co.maintenance_reminders !== false, review_requests: !!co.review_requests, google_review_url: co.google_review_url || "", email_after_sign: co.email_after_sign || "ask" });
     sb().from("automation_log").select("*").order("created_at", { ascending: false }).limit(10).then(({ data }) => setLog(data || []));
   }, [co.id]);
 
@@ -23,7 +23,7 @@ export default function AutomationSettings({ company, reload }: { company: Compa
     const { error } = await sb().from("companies").update({
       auto_reminders: f.auto_reminders, reminder_days: days.length ? days : [1, 15, 30], quote_followup_days: Number(f.quote_followup_days) || 7,
       appointment_reminders: f.appointment_reminders, sms_enabled: f.sms_enabled, sms_sender: f.sms_sender.replace(/[^A-Za-z0-9]/g, "").slice(0, 11) || null,
-      maintenance_reminders: f.maintenance_reminders, review_requests: f.review_requests, google_review_url: f.google_review_url.trim() || null,
+      maintenance_reminders: f.maintenance_reminders, review_requests: f.review_requests, google_review_url: f.google_review_url.trim() || null, email_after_sign: f.email_after_sign,
     }).eq("id", co.id);
     setMsg(error ? `⚠️ ${error.message}` : "✅ Automatisations enregistrées"); reload();
   }
@@ -36,6 +36,15 @@ export default function AutomationSettings({ company, reload }: { company: Compa
     <section className="card space-y-3">
       <h2 className="font-bold">🤖 Automatisations</h2>
       <p className="text-xs text-slate-500">Envoyées automatiquement chaque matin vers 8 h, au nom de votre entreprise (les réponses arrivent dans votre boîte mail).</p>
+      <div>
+        <label className="label">E-mail au client après signature d'un quitus</label>
+        <div className="grid grid-cols-3 gap-1 rounded-xl bg-slate-200 p-1">
+          {[["auto", "Automatique"], ["ask", "Me demander"], ["never", "Jamais"]].map(([k, l]) => (
+            <button key={k} onClick={() => setF({ ...f, email_after_sign: k })} className={`rounded-lg py-2 text-xs font-semibold ${f.email_after_sign === k ? "bg-white shadow" : "text-slate-600"}`}>{l}</button>
+          ))}
+        </div>
+        <p className="mt-1 text-xs text-slate-500">{f.email_after_sign === "auto" ? "Le PDF signé part tout de suite au client." : f.email_after_sign === "ask" ? "Après la signature, l'appli vous demande si vous voulez l'envoyer." : "Rien n'est envoyé : utilisez le bouton « Envoyer par e-mail » quand vous voulez."}</p>
+      </div>
       {T({ k: "auto_reminders", label: "Relancer les factures impayées et les devis sans réponse" })}
       {f.auto_reminders && (
         <div className="grid grid-cols-2 gap-2 pl-6">

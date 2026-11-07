@@ -386,3 +386,5 @@ create policy chantiers_delete on storage.objects for delete to authenticated us
 alter table receptions add column if not exists intervention_id uuid references interventions(id) on delete set null;
 -- receptions.photos (photos du quitus, bucket chantiers)
 alter table receptions add column if not exists photos text[] not null default '{}';
+-- companies.email_after_sign ('auto','ask','never')
+alter table companies add column if not exists email_after_sign text not null default 'ask';

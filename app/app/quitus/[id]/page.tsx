@@ -125,7 +125,8 @@ function Editor() {
     if (done.intervention_id) await sb().from("interventions").update({ status: "done" }).eq("id", done.intervention_id);
     const to = client?.email || done.client_snapshot?.email;
     let msg = "✅ Quitus signé et enregistré";
-    if (to) {
+    const mode = (company as any)?.email_after_sign || "ask";
+    if (to && (mode === "auto" || (mode === "ask" && confirm(`Quitus signé ✅\n\nEnvoyer le PDF par e-mail à ${to} ?`)))) {
       setBusy(true);
       try { const j = await sendMail({ type: "reception", id: done.id, to, pdfBase64: pdfToBase64(await buildReceptionPdf(done, company!, urls)) }); if (j.row) setR(j.row); msg += ` — envoyé à ${to}`; }
       catch (e: any) { msg += ` — envoi impossible : ${e.message}`; }
