@@ -10,13 +10,13 @@ const SUP = [
   ["/app/equipe", "👥", "Équipe (superviseurs et techniciens)"],
   ["/app/clients", "📇", "Clients"], ["/app/planning", "🗓", "Planning"], ["/app/sav", "🛠", "SAV (après-vente)"],
   ["/app/quitus", "✅", "Quitus / PV de réception"], ["/app/entretien", "🔧", "Contrats et attestations d'entretien"],
-  ["/app/chiffre-affaires", "📈", "Chiffre d'affaires"], ["/app/catalogue", "📚", "Catalogue"], ["/app/scan", "📷", "Scanner une plaque"],
+  ["/app/chiffre-affaires", "📈", "Chiffre d'affaires"], ["/app/catalogue", "📚", "Catalogue"], ["/app/scan", "🩺", "Plaque et diagnostic de panne"],
   ["/app/parametres", "🏢", "Mon entreprise"], ["/app/abonnement", "⭐", "Abonnement / se désabonner"], ["/app/export", "📊", "Export comptable"],
   ["/app/suggestions", "💡", "Suggestions & problèmes"],
   ["/legal/cgv", "⚖️", "CGU, confidentialité, mentions légales"],
 ];
 const TECH = [
-  ["/app/clients", "📇", "Clients"], ["/app/quitus", "✅", "Quitus / PV de réception"], ["/app/scan", "📷", "Scanner une plaque"],
+  ["/app/clients", "📇", "Clients"], ["/app/quitus", "✅", "Quitus / PV de réception"], ["/app/scan", "🩺", "Plaque et diagnostic de panne"],
   ["/app/parametres", "👤", "Mon profil"], ["/app/suggestions", "💡", "Suggestions & problèmes"], ["/legal/confidentialite", "⚖️", "Confidentialité"],
 ];
 

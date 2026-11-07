@@ -15,6 +15,7 @@ import { equipmentLabel } from "@/lib/maintenance";
 import { pdfToBase64, shareOrSave } from "@/lib/pdf-maintenance";
 import { removeMedia, signedUrls, uploadPhoto } from "@/lib/chantiers";
 import { MediaButtons, MediaGrid } from "@/components/Media";
+import Diagnostic from "@/components/Diagnostic";
 import { askEmail, sendMail, snapshotOf } from "@/lib/send";
 import type { Client } from "@/lib/types";
 
@@ -208,6 +209,8 @@ function Editor() {
         {t.id && (
           <section className="card space-y-3">
             <h2 className="font-bold">Intervention</h2>
+            {!closed && <Diagnostic equipment={[equipmentLabel(t.equipment), t.equipment?.brand, t.equipment?.model, (t.equipment as any)?.energy, (t.equipment as any)?.power_kw, t.equipment?.year && `année ${t.equipment.year}`].filter(Boolean).join(" ")}
+              onUse={(txt) => set({ diagnosis: [t.diagnosis, txt].filter(Boolean).join("\n") })} />}
             <div><label className="label">Diagnostic</label><textarea className="input text-sm" rows={2} disabled={closed} value={t.diagnosis || ""} onChange={(e) => set({ diagnosis: e.target.value })} /></div>
             <div><label className="label">Travaux réalisés</label><textarea className="input text-sm" rows={3} disabled={closed} value={t.actions || ""} onChange={(e) => set({ actions: e.target.value })} /></div>
             <div><label className="label">Pièces remplacées / à commander</label><textarea className="input text-sm" rows={2} disabled={closed} value={t.parts || ""} onChange={(e) => set({ parts: e.target.value })} /></div>

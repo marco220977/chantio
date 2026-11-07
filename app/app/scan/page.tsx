@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Header from "@/components/Header";
 import { scanPlate } from "@/lib/scan";
+import Diagnostic from "@/components/Diagnostic";
 
 type Result = { brand?: string; model?: string; type?: string; energy?: string; power_kw?: string; serial_number?: string; year?: string; other?: string; confidence?: string };
 
@@ -32,9 +33,9 @@ export default function Scan() {
 
   return (
     <>
-      <Header back title="Scanner une plaque" />
+      <Header back title="Plaque et diagnostic" />
       <div className="space-y-4 p-4">
-        <p className="text-sm text-slate-600">Photographiez la plaque signalétique de la chaudière, PAC ou chauffe-eau. L'appareil est identifié automatiquement.</p>
+        <p className="text-sm text-slate-600">Photographiez la plaque signalétique de la chaudière, PAC ou chauffe-eau. L'appareil est identifié automatiquement, puis l'assistant vous aide à trouver la panne à partir du code erreur.</p>
         <label className="btn-brand w-full cursor-pointer py-4 text-lg">
           📷 Prendre la photo
           <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
@@ -51,6 +52,7 @@ export default function Scan() {
             <button className="btn-ghost w-full" onClick={() => navigator.clipboard.writeText(text)}>📋 Copier (à coller dans un devis ou une fiche client)</button>
           </div>
         )}
+        {!busy && <Diagnostic key={res ? "r" : "n"} equipment={res ? [res.type, res.brand, res.model, res.energy, res.power_kw, res.year && `année ${res.year}`].filter(Boolean).join(" ") : ""} />}
       </div>
     </>
   );
