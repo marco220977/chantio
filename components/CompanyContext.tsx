@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { sb } from "@/lib/supabase";
+import { currentUser, sb } from "@/lib/supabase";
 import type { Company } from "@/lib/types";
 
 export type Member = { user_id: string; company_id: string; role: "owner" | "supervisor" | "technician"; full_name?: string | null; email?: string | null };
@@ -17,7 +17,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
   const [loaded, setLoaded] = useState(false);
   const reload = useCallback(async () => {
     const s = sb();
-    const { data: { user } } = await s.auth.getUser();
+    const user = await currentUser();
     const [{ data: co }, { data: ms }] = await Promise.all([
       s.from("companies").select("*").maybeSingle(),
       s.from("members").select("user_id, company_id, role, full_name, email").order("created_at"),

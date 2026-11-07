@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { sb } from "@/lib/supabase";
+import { currentUser, sb } from "@/lib/supabase";
 import { addDays, dateFr } from "@/lib/calc";
 import { memberName, useCompany } from "@/components/CompanyContext";
 import Header from "@/components/Header";
@@ -44,7 +44,7 @@ function Editor() {
       return;
     }
     (async () => {
-      const { data: { user } } = await s.auth.getUser();
+      const user = await currentUser();
       const { data: mine } = await s.from("members").select("full_name, role").eq("user_id", user?.id).maybeSingle();
       const base: Ticket = { id: "", status: "open", priority: "normal", origin: "Téléphone", equipment: {}, photos: [], warranty: "hors_garantie", client_id: params.get("client") || null,
         ...(mine?.role === "technician" ? { assigned_to: user?.id, technician: mine.full_name || "" } : {}) } as Ticket;

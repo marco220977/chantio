@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { sb } from "@/lib/supabase";
+import { currentUser, sb } from "@/lib/supabase";
 import Header from "@/components/Header";
 import { memberName, useCompany } from "@/components/CompanyContext";
 import { compressPhoto } from "@/lib/chantiers";
@@ -25,7 +25,7 @@ export default function Suggestions() {
   async function send() {
     if (text.trim().length < 5) return setMsg("Écrivez quelques mots.");
     setBusy(true); setMsg("");
-    const { data: { user } } = await sb().auth.getUser();
+    const user = await currentUser();
     const { data, error } = await sb().from("feedback").insert({ kind, message: text.trim(), screenshot: shot || null, author: me ? memberName(me) : "", author_email: user?.email,
       page: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 160) : null }).select("id").single();
     setBusy(false);

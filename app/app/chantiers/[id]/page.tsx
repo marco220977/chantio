@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import jsPDF from "jspdf";
-import { sb } from "@/lib/supabase";
+import { currentUser, sb } from "@/lib/supabase";
 import { addDays, dateFr } from "@/lib/calc";
 import { toDataUrl } from "@/lib/pdf";
 import { memberName, useCompany, type Member } from "@/components/CompanyContext";
@@ -120,7 +120,7 @@ function Detail({ id }: { id: string }) {
         paths.push(await uploadPhoto(company!.id, c!.id, files[i]));
       }
       setBusy("Enregistrement…");
-      const { data: { user } } = await sb().auth.getUser();
+      const user = await currentUser();
       const { data: me } = await sb().from("members").select("full_name").eq("user_id", user?.id).maybeSingle();
       const { error } = await sb().from("chantier_entries").insert({ chantier_id: c!.id, tag, text: text.trim() || null, photos: paths, author: me?.full_name || null });
       if (error) throw error;

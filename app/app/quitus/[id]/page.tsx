@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { sb } from "@/lib/supabase";
+import { currentUser, sb } from "@/lib/supabase";
 import { addDays, dateFr } from "@/lib/calc";
 import { useCompany } from "@/components/CompanyContext";
 import Header from "@/components/Header";
@@ -36,7 +36,7 @@ function Editor() {
     s.from("clients").select("*").order("name").then(({ data }) => setClients(data || []));
     if (!isNew) { s.from("receptions").select("*").eq("id", id).single().then(async ({ data }) => { setR(data); if (data?.photos?.length) setUrls(await signedUrls(data.photos)); }); return; }
     (async () => {
-      const { data: { user } } = await s.auth.getUser();
+      const user = await currentUser();
       const { data: me } = await s.from("members").select("full_name").eq("user_id", user?.id).maybeSingle();
       const base: Reception = { id: "", status: "draft", reserves: [], photos: [], reception_date: addDays(0), works_end_date: addDays(0), company_signer: me?.full_name || "" };
       let docId = params.get("doc");

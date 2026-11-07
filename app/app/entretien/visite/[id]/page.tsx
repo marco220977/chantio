@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { sb } from "@/lib/supabase";
+import { currentUser, sb } from "@/lib/supabase";
 import { addDays, dateFr } from "@/lib/calc";
 import { useCompany } from "@/components/CompanyContext";
 import Header from "@/components/Header";
@@ -35,7 +35,7 @@ function Visit() {
     s.from("clients").select("*").order("name").then(({ data }) => setClients(data || []));
     if (!isNew) { s.from("maintenance_reports").select("*").eq("id", id).single().then(({ data }) => setR(data)); return; }
     (async () => {
-      const { data: { user } } = await s.auth.getUser();
+      const user = await currentUser();
       const { data: me } = await s.from("members").select("full_name").eq("user_id", user?.id).maybeSingle();
       const base: Report = { id: "", status: "draft", equipment: {}, checklist: [], measures: {}, visit_date: addDays(0), technician: me?.full_name || "", client_id: params.get("client"), assigned_to: user?.id } as Report;
       const cid = params.get("contract");
