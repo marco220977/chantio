@@ -1,5 +1,4 @@
 "use client";
-import { isOffline, queueDoc } from "@/lib/offline";
 import AiQuote from "@/components/AiQuote";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -134,12 +133,6 @@ function Editor() {
     const locked = cur.id && cur.kind !== "quote" && doc!.status !== "draft";
     if (locked) {
       for (const k of Object.keys(payload)) if (!["status", "paid_at", "payment_method"].includes(k)) delete payload[k];
-    }
-    if (isOffline() && cur.kind === "quote" && !locked) {
-      queueDoc(cur.id, payload, cur.title || "Devis");
-      setBusy(false);
-      setErr("📴 Hors ligne : devis enregistré sur l'appareil. Il sera envoyé (et numéroté) automatiquement au retour du réseau.");
-      return null;
     }
     if (!cur.id && cur.kind === "quote") {
       const { data: num, error } = await s.rpc("next_number", { p_kind: "D" });

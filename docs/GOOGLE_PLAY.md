@@ -1,6 +1,6 @@
 # Publier Chantio sur Google Play
 
-Chantio est une PWA (installable + hors ligne). Google Play l'accepte sous forme de « Trusted Web Activity » (TWA).
+Chantio est une PWA (appli web installable). Google Play l'accepte sous forme de « Trusted Web Activity » (TWA).
 
 1. Créez un compte développeur : https://play.google.com/console (25 $ une seule fois).
 2. Allez sur https://www.pwabuilder.com, entrez l'adresse de l'appli (https://chantio-alpha.vercel.app ou votre domaine).

@@ -13,7 +13,7 @@ export function sb() {
   return client;
 }
 
-// Utilisateur courant lu sur l'appareil (fonctionne aussi hors ligne)
+// Utilisateur courant (session enregistrée sur l'appareil)
 export async function currentUser() {
   const { data: { session } } = await sb().auth.getSession();
   return session?.user ?? null;
