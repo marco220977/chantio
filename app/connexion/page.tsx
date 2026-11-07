@@ -31,6 +31,9 @@ function Form() {
         options: { data: { company_name: company, full_name: name, ...(parrainName ? { referral_code: parrain } : {}) }, emailRedirectTo: `${location.origin}/app` },
       });
       if (error) setMsg(frError(error.message));
+      // Adresse déjà inscrite : Supabase renvoie un faux succès sans identité
+      else if (data.user && (data.user.identities?.length ?? 0) === 0)
+        setMsg(`Cette adresse e-mail a déjà un compte${parrainName ? " : le parrainage ne s'applique qu'aux nouveaux comptes" : ""}. Connectez-vous avec « J'ai déjà un compte » (ou « Mot de passe oublié »).`);
       else if (!data.session) setMsg("Compte créé ! Confirmez votre adresse via l'e-mail reçu, puis connectez-vous.");
       else router.replace("/app/parametres?bienvenue=1");
     } else {
