@@ -9,7 +9,7 @@ import { box, clientLines, equipLines, footer, header, paragraph, signatures } f
 
 export type Reserve = { label: string; deadline?: string; lifted_at?: string | null };
 export type Reception = {
-  id: string; number?: string; status: string; chantier_id?: string | null; document_id?: string | null; intervention_id?: string | null;
+  id: string; number?: string; status: string; chantier_id?: string | null; document_id?: string | null; intervention_id?: string | null; photos?: string[];
   client_id?: string | null; client_snapshot?: any; address?: string; works?: string; works_end_date?: string;
   reception_date?: string; with_reserves?: boolean; reserves: Reserve[]; notes?: string;
   signed_at?: string; signer_name?: string; signature_data?: string; signer_photo?: string | null;
@@ -55,7 +55,23 @@ export function warrantyFromReception(receptionDate?: string): string {
 }
 
 // ---------------- PV DE RÉCEPTION / QUITUS ----------------
-export async function buildReceptionPdf(r: Reception, company: Company) {
+async function photosBlock(pdf: jsPDF, y: number, paths: string[], urls: Record<string, string>, max = 8) {
+  const M = 15;
+  const list = paths.filter((p) => urls[p]).slice(0, max);
+  if (!list.length) return y;
+  if (y + 50 > 280) { pdf.addPage(); y = M; }
+  pdf.setFont("helvetica", "bold").setFontSize(9.5).text("Photos", M, y); y += 3;
+  let x = M;
+  for (const p of list) {
+    const img = await toDataUrl(urls[p]); if (!img) continue;
+    if (x + 42 > 196) { x = M; y += 45; if (y + 42 > 280) { pdf.addPage(); y = M; } }
+    const pr = pdf.getImageProperties(img); const h = 40, w = Math.min(42, (pr.width / pr.height) * h);
+    pdf.addImage(img, "JPEG", x, y, w, h); x += 45;
+  }
+  return y + 45;
+}
+
+export async function buildReceptionPdf(r: Reception, company: Company, photoUrls: Record<string, string> = {}) {
   const pdf = new jsPDF({ unit: "mm", format: "a4" });
   const M = 15;
   let y = await header(pdf, company, "PROCÈS-VERBAL DE RÉCEPTION DES TRAVAUX", r.number || "", [`Date de réception : ${dateFr(r.reception_date)}`]);
@@ -90,6 +106,7 @@ export async function buildReceptionPdf(r: Reception, company: Company) {
     `• garantie décennale : jusqu'au ${dateFr(addYears(d, 10))}.\n` +
     `Les désordres apparents non signalés au présent procès-verbal sont réputés acceptés.`);
   if (r.notes) y = paragraph(pdf, y, "Observations", r.notes);
+  y = await photosBlock(pdf, y, r.photos || [], photoUrls);
   y = paragraph(pdf, y, "Quitus", `Sous réserve de la levée des éventuelles réserves ci-dessus, le maître d'ouvrage donne quitus à ${company.name} pour l'exécution des travaux décrits.`);
 
   signatures(pdf, y + 2, company, "Le maître d'ouvrage", { name: r.signer_name, data: r.signature_data, at: r.signed_at, photo: r.signer_photo }, r.company_signer);

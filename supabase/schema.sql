@@ -384,3 +384,5 @@ create policy chantiers_delete on storage.objects for delete to authenticated us
 
 -- receptions.intervention_id (lien quitus ↔ intervention du planning)
 alter table receptions add column if not exists intervention_id uuid references interventions(id) on delete set null;
+-- receptions.photos (photos du quitus, bucket chantiers)
+alter table receptions add column if not exists photos text[] not null default '{}';

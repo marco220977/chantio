@@ -12,6 +12,7 @@ import SignaturePad from "@/components/SignaturePad";
 import { buildReceptionPdf, type Reception } from "@/lib/quitus-sav";
 import { pdfToBase64, shareOrSave } from "@/lib/pdf-maintenance";
 import { askEmail, sendMail, snapshotOf } from "@/lib/send";
+import { signedUrls, uploadPhoto } from "@/lib/chantiers";
 import type { Client } from "@/lib/types";
 
 function Editor() {
@@ -27,15 +28,17 @@ function Editor() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [toast, setToast] = useState("");
+  const [urls, setUrls] = useState<Record<string, string>>({});
+  const [upl, setUpl] = useState("");
 
   useEffect(() => {
     const s = sb();
     s.from("clients").select("*").order("name").then(({ data }) => setClients(data || []));
-    if (!isNew) { s.from("receptions").select("*").eq("id", id).single().then(({ data }) => setR(data)); return; }
+    if (!isNew) { s.from("receptions").select("*").eq("id", id).single().then(async ({ data }) => { setR(data); if (data?.photos?.length) setUrls(await signedUrls(data.photos)); }); return; }
     (async () => {
       const { data: { user } } = await s.auth.getUser();
       const { data: me } = await s.from("members").select("full_name").eq("user_id", user?.id).maybeSingle();
-      const base: Reception = { id: "", status: "draft", reserves: [], reception_date: addDays(0), works_end_date: addDays(0), company_signer: me?.full_name || "" };
+      const base: Reception = { id: "", status: "draft", reserves: [], photos: [], reception_date: addDays(0), works_end_date: addDays(0), company_signer: me?.full_name || "" };
       let docId = params.get("doc");
       const chId = params.get("chantier");
       const ivId = params.get("intervention");
@@ -94,6 +97,27 @@ function Editor() {
     return data;
   }
 
+  async function addPhotos(files: FileList) {
+    const saved = r!.id ? r! : await save(); if (!saved) return;
+    try {
+      const paths = [...(saved.photos || [])];
+      const list = Array.from(files);
+      for (let i = 0; i < list.length; i++) { setUpl(`Envoi photo ${i + 1}/${list.length}…`); paths.push(await uploadPhoto(company!.id, `quitus-${saved.id}`, list[i])); }
+      const { data, error } = await sb().from("receptions").update({ photos: paths }).eq("id", saved.id).select().single();
+      if (error) throw error;
+      setR({ ...r!, ...saved, photos: data.photos });
+      setUrls(await signedUrls(data.photos));
+    } catch (e: any) { setErr(e.message); }
+    setUpl("");
+  }
+  async function removePhoto(p: string) {
+    if (!confirm("Supprimer cette photo ?")) return;
+    await sb().storage.from("chantiers").remove([p]);
+    const photos = (r!.photos || []).filter((x) => x !== p);
+    await sb().from("receptions").update({ photos }).eq("id", r!.id);
+    setR({ ...r!, photos });
+  }
+
   async function lift(i: number) {
     const reserves = r!.reserves.map((x, j) => (j === i ? { ...x, lifted_at: x.lifted_at ? null : addDays(0) } : x));
     const all = reserves.every((x) => x.lifted_at);
@@ -105,12 +129,13 @@ function Editor() {
     const to = await askEmail(client?.email || r!.client_snapshot?.email, r!.client_id); if (!to) return;
     if (!confirm(`Envoyer le procès-verbal ${r!.number} à ${to} ?`)) return;
     setBusy(true); setErr("");
-    try { const j = await sendMail({ type: "reception", id: r!.id, to, pdfBase64: pdfToBase64(await buildReceptionPdf(r!, company!)) }); if (j.row) setR(j.row); flash(`✅ Envoyé à ${to}`); }
+    try { const j = await sendMail({ type: "reception", id: r!.id, to, pdfBase64: pdfToBase64(await buildReceptionPdf(r!, company!, urls)) }); if (j.row) setR(j.row); flash(`✅ Envoyé à ${to}`); }
     catch (e: any) { setErr(e.message); }
     setBusy(false);
   }
 
   const pending = r.reserves.filter((x) => !x.lifted_at).length;
+  const canPhoto = editable || pending > 0;
 
   return (
     <>
@@ -176,6 +201,31 @@ function Editor() {
         </section>
 
         <section className="card space-y-3">
+          <h2 className="font-bold">Photos</h2>
+          {(r.photos || []).length > 0 && (
+            <div className="grid grid-cols-4 gap-1.5">
+              {(r.photos || []).map((p) => (
+                <div key={p} className="relative aspect-square overflow-hidden rounded-lg bg-slate-100">
+                  {urls[p] && <a href={urls[p]} target="_blank" rel="noreferrer"><img src={urls[p]} alt="" className="h-full w-full object-cover" /></a>}
+                  {canPhoto && <button className="absolute right-0.5 top-0.5 rounded-full bg-black/60 px-1.5 text-xs text-white" onClick={() => removePhoto(p)}>×</button>}
+                </div>
+              ))}
+            </div>
+          )}
+          {!(r.photos || []).length && !canPhoto && <p className="text-sm text-slate-400">Aucune photo.</p>}
+          {canPhoto && (
+            <div className="grid grid-cols-2 gap-2">
+              <label className="btn-ghost cursor-pointer">📷 Prendre une photo
+                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { if (e.target.files?.length) addPhotos(e.target.files); e.target.value = ""; }} /></label>
+              <label className="btn-ghost cursor-pointer">🖼 Galerie
+                <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { if (e.target.files?.length) addPhotos(e.target.files); e.target.value = ""; }} /></label>
+            </div>
+          )}
+          {upl && <p className="text-sm text-slate-500">{upl}</p>}
+          {canPhoto && <p className="text-xs text-slate-400">Les photos sont ajoutées au procès-verbal PDF (8 maximum).</p>}
+        </section>
+
+        <section className="card space-y-3">
           <div><label className="label">Observations</label><textarea className="input text-sm" rows={2} disabled={!editable} value={r.notes || ""} onChange={(e) => set({ notes: e.target.value })} /></div>
           <div><label className="label">Signataire pour l'entreprise</label><input className="input" disabled={!editable} value={r.company_signer || ""} onChange={(e) => set({ company_signer: e.target.value })} /></div>
         </section>
@@ -199,8 +249,8 @@ function Editor() {
           }}>✍️ Faire signer le quitus</button>}
           {r.id && (
             <div className="grid grid-cols-2 gap-2">
-              <button className="btn-ghost" onClick={() => setPreview(() => () => buildReceptionPdf(r, company))}>👁 Aperçu</button>
-              <button className="btn-ghost" onClick={async () => shareOrSave(await buildReceptionPdf(r, company), `${r.number}.pdf`)}>📤 Partager</button>
+              <button className="btn-ghost" onClick={() => setPreview(() => () => buildReceptionPdf(r, company, urls))}>👁 Aperçu</button>
+              <button className="btn-ghost" onClick={async () => shareOrSave(await buildReceptionPdf(r, company, urls), `${r.number}.pdf`)}>📤 Partager</button>
             </div>
           )}
           {r.status === "signed" && <button className="btn-primary w-full" disabled={busy} onClick={send}>📧 {r.sent_at ? "Renvoyer" : "Envoyer"} par e-mail</button>}
