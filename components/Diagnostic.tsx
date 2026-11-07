@@ -6,6 +6,24 @@ type Res = { code_meaning?: string; reliability?: string; summary?: string; caus
   parts?: string[]; safety?: string[]; questions?: string[]; sources?: { title: string; url: string }[] };
 const PROB: Record<string, string> = { forte: "bg-red-100 text-red-700", moyenne: "bg-amber-100 text-amber-800", faible: "bg-slate-100 text-slate-600" };
 
+type Notice = { id: number; brand: string; range_label: string | null; code: string; meaning: string; causes: string | null; kind: string | null; source: string | null; source_level: string | null };
+
+// Même normalisation que la base error_codes : F.28 → F28, "5 01" → 501, "E:14" → E14, "Er 101" → 101
+export const normCode = (c: string) => c.toUpperCase().replace(/[\s.:\-]/g, "").replace(/^ER/, "");
+const BRANDS: [string, RegExp][] = [
+  ["Saunier Duval", /saunier|duval|\bsd\b|thema|opalia|isotwin|isofast/i],
+  ["Chaffoteaux", /chaffoteaux|chaffo|mira|talia|urbia|serelia|pigma|niagara/i],
+  ["De Dietrich", /dietrich|naneo|vivadens|innovens|mcr|evodens/i],
+  ["Atlantic", /atlantic|naema|naia|idra|alfea/i],
+  ["ELM Leblanc", /e\.?l\.?m|leblanc|megalis|mégalis|egalis|égalis|acleis|odealis/i],
+];
+const brandOf = (eq: string) => BRANDS.find(([, r]) => r.test(eq))?.[0] || "";
+const isUrl = (s?: string | null) => !!s && /^https?:\/\//.test(s);
+
+export function noticeText(n: Notice) {
+  return [`Code ${n.code} (${n.brand}${n.range_label ? ` · ${n.range_label}` : ""}) : ${n.meaning}`, n.causes && n.causes !== "—" && `À vérifier : ${n.causes}`].filter(Boolean).join("\n");
+}
+
 export function diagText(r: Res, code: string) {
   return [code && `Code ${code}${r.code_meaning ? ` : ${r.code_meaning}` : ""}`, r.summary,
     ...(r.causes || []).map((c, i) => `${i + 1}. ${c.cause}`)].filter(Boolean).join("\n");
@@ -22,7 +40,25 @@ export default function Diagnostic({ equipment = "", onUse }: { equipment?: stri
   const [res, setRes] = useState<Res | null>(null);
   const [rec, setRec] = useState(false);
   const recog = useRef<any>(null);
+  const [notices, setNotices] = useState<Notice[] | null>(null);
+  const [others, setOthers] = useState(false);
   useEffect(() => { if (equipment) setEq(equipment); }, [equipment]);
+
+  // Recherche instantanée dans la base des notices constructeurs
+  useEffect(() => {
+    const n = normCode(code);
+    if (n.length < 1) { setNotices(null); return; }
+    let stop = false;
+    const t = setTimeout(async () => {
+      const { data } = await sb().from("error_codes").select("id,brand,range_label,code,meaning,causes,kind,source,source_level").contains("code_norms", [n]).limit(40);
+      if (!stop) { setNotices((data as Notice[]) || []); setOthers(false); }
+    }, 300);
+    return () => { stop = true; clearTimeout(t); };
+  }, [code]);
+  const brand = brandOf(eq);
+  const mine = (notices || []).filter((x) => !brand || x.brand === brand);
+  const rest = brand ? (notices || []).filter((x) => x.brand !== brand) : [];
+  const shown = brand && !mine.length ? rest : others ? [...mine, ...rest] : mine;
 
   function dictate() {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -56,6 +92,25 @@ export default function Diagnostic({ equipment = "", onUse }: { equipment?: stri
         <button className="btn-brand col-span-2" disabled={busy || (!code.trim() && symptoms.trim().length < 4)} onClick={run}>{busy ? "Recherche… (≈ 30 s)" : res ? "🔁 Relancer" : "🔍 Trouver la panne"}</button>
       </div>
       {err && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
+
+      {notices && normCode(code) && (
+        <div className="space-y-2">
+          {!notices.length && <p className="rounded-xl bg-slate-50 p-3 text-xs text-slate-500">📘 Code {code} absent de la base des notices ({brand || "toutes marques"}). Utilisez « Trouver la panne » pour une recherche IA.</p>}
+          {brand && !mine.length && !!rest.length && <p className="text-xs text-amber-700">Aucune notice {brand} pour ce code. Résultats d&apos;autres marques :</p>}
+          {shown.map((n) => (
+            <div key={n.id} className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3 text-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">📘 D&apos;après la notice — {n.brand}</p>
+              {n.range_label && <p className="text-[11px] text-slate-500">{n.range_label}</p>}
+              <p className="mt-1"><b>{n.code}</b> : {n.meaning}</p>
+              {n.causes && n.causes !== "—" && <p className="mt-1 text-slate-700"><b>À vérifier :</b> {n.causes}</p>}
+              <p className="mt-1 text-[11px] text-slate-500">{n.kind && <span className="chip mr-1 bg-white">{n.kind}</span>}{isUrl(n.source) ? <a href={n.source!} target="_blank" rel="noreferrer" className="text-brand underline">Voir la notice</a> : n.source}</p>
+              {onUse && <button className="btn-ghost mt-2 w-full !py-1.5 text-sm" onClick={() => onUse(noticeText(n))}>📝 Reporter dans le SAV</button>}
+            </div>
+          ))}
+          {brand && !!mine.length && !!rest.length && !others && <button className="text-xs text-brand underline" onClick={() => setOthers(true)}>Voir aussi les autres marques ({rest.length})</button>}
+          {!!notices.length && <p className="text-[11px] text-slate-400">Vérifiez que la gamme correspond à l&apos;appareil : un même code peut changer de sens selon la génération. Pas la bonne ? Appuyez sur « Trouver la panne » (IA).</p>}
+        </div>
+      )}
 
       {res && (
         <div className="space-y-3">
