@@ -396,3 +396,4 @@ alter table interventions add column if not exists sav_id uuid references sav_ti
 -- Abonnement obligatoire après l'essai (migrations subscription_enforcement + cron_only_active_companies) :
 -- company_active(), my_company_active(), trigger require_subscription() sur documents/receptions/maintenance_reports/contracts/
 -- sav_tickets/purchase_orders/interventions/chantiers, next_number() bloqué, cron limité aux comptes actifs.
+-- admin_platform_stats() : tableau de bord des abonnés (réservé platform_admins)

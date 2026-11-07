@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { sb } from "@/lib/supabase";
 import Header from "@/components/Header";
 import { memberName, ROLE_LABEL, useCompany } from "@/components/CompanyContext";
@@ -22,11 +23,14 @@ const TECH = [
 export default function Menu() {
   const router = useRouter();
   const { me, isSup, company } = useCompany();
+  const [admin, setAdmin] = useState(false);
+  useEffect(() => { sb().rpc("is_platform_admin").then(({ data }) => setAdmin(!!data)); }, []);
   return (
     <>
       <Header title="Menu" />
       <div className="space-y-2 p-4">
         {me && <div className="card bg-slate-50 text-sm"><p className="font-semibold">{memberName(me)}</p><p className="text-slate-500">{ROLE_LABEL[me.role]} · {company?.name}</p></div>}
+        {admin && <Link href="/app/admin" className="card flex items-center gap-3 border-2 border-flame"><span className="text-xl">📊</span><span className="font-semibold">Tableau de bord des abonnés</span><span className="ml-auto text-slate-300">›</span></Link>}
         {(isSup ? SUP : TECH).map(([h, i, l]) => (
           <Link key={h} href={h} className="card flex items-center gap-3"><span className="text-xl">{i}</span><span className="font-semibold">{l}</span><span className="ml-auto text-slate-300">›</span></Link>
         ))}
