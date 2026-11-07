@@ -96,12 +96,15 @@ function Planning() {
               </div>
               {items.length === 0 && <p className="text-xs text-slate-400">—</p>}
               {items.map((i) => (
-                <button key={i.id} onClick={() => ((i as any).sav_id ? router.push(`/app/sav/${(i as any).sav_id}`) : setEdit(i))} className={`card mb-2 block w-full border-l-4 text-left ${i.status === "done" ? "border-l-green-500 opacity-60" : i.status === "canceled" ? "border-l-red-400 opacity-50" : "border-l-flame"}`}>
-                  <p className="font-semibold">{new Date(i.starts_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · {i.title}</p>
-                  <p className="text-sm text-slate-500">{[i.clients?.name, i.address].filter(Boolean).join(" · ")}</p>
-                  {(i as any).sav_id && <p className="text-xs font-semibold text-brand">🛠 Ouvrir la fiche SAV →</p>}
-                  <p className="text-xs text-slate-400">👷 {i.technician || "Non attribué"}{i.id && quitus[i.id] ? (quitus[i.id].status === "draft" ? " · 📝 quitus à signer" : " · ✅ quitus signé") : ""}</p>
-                </button>
+                <div key={i.id} className={`card mb-2 flex w-full items-stretch gap-2 border-l-4 !p-0 ${i.status === "done" ? "border-l-green-500 opacity-70" : i.status === "canceled" ? "border-l-red-400 opacity-50" : "border-l-flame"}`}>
+                  <button className="flex-1 p-4 text-left" onClick={() => router.push((i as any).sav_id ? `/app/sav/${(i as any).sav_id}` : `/app/quitus/nouveau?intervention=${i.id}`)}>
+                    <p className="font-semibold">{new Date(i.starts_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · {i.title}</p>
+                    <p className="text-sm text-slate-500">{[i.clients?.name, i.address].filter(Boolean).join(" · ")}</p>
+                    <p className="text-xs font-semibold text-brand">{(i as any).sav_id ? "🛠 Ouvrir la fiche SAV →" : i.id && quitus[i.id] ? (quitus[i.id].status === "draft" ? "📝 Quitus à signer →" : "✅ Quitus signé →") : "📝 Quitus d'intervention →"}</p>
+                    <p className="text-xs text-slate-400">👷 {i.technician || "Non attribué"}</p>
+                  </button>
+                  <button className="border-l border-slate-100 px-4 text-xl text-slate-400" aria-label="Modifier l'intervention" onClick={() => setEdit(i)}>✏️</button>
+                </div>
               ))}
             </div>
           );
