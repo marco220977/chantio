@@ -19,7 +19,7 @@ function Editor() {
   const { id } = useParams<{ id: string }>();
   const params = useSearchParams();
   const router = useRouter();
-  const { company } = useCompany();
+  const { company, isSup } = useCompany();
   const isNew = id === "nouveau";
   const [r, setR] = useState<Reception | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
@@ -30,11 +30,15 @@ function Editor() {
   const [toast, setToast] = useState("");
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [upl, setUpl] = useState("");
+  const [invoiceId, setInvoiceId] = useState<string | null>(null);
 
   useEffect(() => {
     const s = sb();
     s.from("clients").select("*").order("name").then(({ data }) => setClients(data || []));
-    if (!isNew) { s.from("receptions").select("*").eq("id", id).single().then(async ({ data }) => { setR(data); if (data?.photos?.length) setUrls(await signedUrls(data.photos)); }); return; }
+    if (!isNew) { s.from("receptions").select("*").eq("id", id).single().then(async ({ data }) => {
+      setR(data); if (data?.photos?.length) setUrls(await signedUrls(data.photos));
+      if (data?.document_id) { const { data: inv } = await s.from("documents").select("id").eq("source_quote_id", data.document_id).eq("kind", "invoice").neq("status", "canceled").order("created_at", { ascending: false }).limit(1); if (inv?.[0]) setInvoiceId(inv[0].id); }
+    }); return; }
     (async () => {
       const user = await currentUser();
       const { data: me } = await s.from("members").select("full_name").eq("user_id", user?.id).maybeSingle();
@@ -145,15 +149,30 @@ function Editor() {
       catch (e: any) { msg += ` — envoi impossible : ${e.message}`; }
       setBusy(false);
     }
+    const inv = !done.with_reserves ? await makeInvoice(done) : null;
+    if (inv) msg += " — facture brouillon créée";
     flash(msg);
-    if (done.intervention_id) setTimeout(() => router.push("/app/planning"), 2500);
+    if (inv && isSup) setTimeout(() => router.push(`/app/doc/${inv}`), 2500);
+    else if (done.intervention_id) setTimeout(() => router.push("/app/planning"), 2500);
+  }
+
+  // Réception sans réserve (ou réserves levées) → facture du devis + avenants signés
+  async function makeInvoice(rec: Reception): Promise<string | null> {
+    if (!rec.document_id) return null;
+    const { data, error } = await sb().rpc("invoice_from_quote", { p_quote: rec.document_id, p_reception: rec.id });
+    if (error) { setErr(`Facture non créée : ${error.message}`); return null; }
+    setInvoiceId(data);
+    return data as string;
   }
 
   async function lift(i: number) {
     const reserves = r!.reserves.map((x, j) => (j === i ? { ...x, lifted_at: x.lifted_at ? null : addDays(0) } : x));
     const all = reserves.every((x) => x.lifted_at);
     await save({ reserves, reserves_lifted_at: all ? new Date().toISOString() : null });
-    if (all) flash("✅ Toutes les réserves sont levées");
+    if (all) {
+      const inv = await makeInvoice(r!);
+      flash(inv ? "✅ Réserves levées — facture brouillon créée" : "✅ Toutes les réserves sont levées");
+    }
   }
 
   async function send() {
@@ -268,6 +287,9 @@ function Editor() {
             <p className="text-xs text-slate-500">Signé par {r.signer_name}<br />le {new Date(r.signed_at!).toLocaleString("fr-FR")}</p>
           </section>
         )}
+        {editable && !r.document_id && <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-800">Aucun devis lié à ce quitus : la facture ne sera pas créée automatiquement après la signature.</p>}
+        {editable && r.document_id && <p className="rounded-xl bg-green-50 p-3 text-xs text-green-800">Après signature sans réserve, la facture du devis (avec ses avenants signés) sera créée automatiquement en brouillon.</p>}
+        {invoiceId && isSup && <Link href={`/app/doc/${invoiceId}`} className="btn-brand w-full">💶 Voir la facture créée</Link>}
         {r.sent_at && <p className="text-xs text-green-700">📧 Envoyé le {new Date(r.sent_at).toLocaleString("fr-FR")} à {r.sent_to}</p>}
 
         <section className="space-y-2">
