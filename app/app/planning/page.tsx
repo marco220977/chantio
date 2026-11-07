@@ -48,9 +48,9 @@ function Planning() {
     });
   }, [params]);
 
-  async function save() {
+  async function save(over?: Partial<Iv>) {
     if (!edit) return;
-    const { id, clients: _c, ...row } = edit;
+    const { id, clients: _c, ...row } = { ...edit, ...over };
     const wasDone = id ? list.find((x) => x.id === id)?.status === "done" : false;
     const { data: saved } = id ? await sb().from("interventions").update(row).eq("id", id).select().single() : await sb().from("interventions").insert(row).select().single();
     setEdit(null);
@@ -130,14 +130,14 @@ function Planning() {
                 {team.map((m) => <option key={m.user_id} value={m.user_id}>{memberName(m)}{m.role === "technician" ? " (technicien)" : ""}</option>)}
               </select></div>
             <textarea className="input" rows={2} placeholder="Notes" value={edit.notes || ""} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} />
-            <select className="input" value={edit.status} onChange={(e) => setEdit({ ...edit, status: e.target.value })}>
+            <select className="input" value={edit.status} onChange={(e) => { setEdit({ ...edit, status: e.target.value }); if (e.target.value === "done" && edit.id && edit.title) save({ status: "done" }); }}>
               <option value="planned">Prévue</option><option value="done">Terminée</option><option value="canceled">Annulée</option>
             </select>
             {edit.id && quitus[edit.id] && <button className="btn-ghost w-full" onClick={() => router.push(`/app/quitus/${quitus[edit.id!].id}`)}>{quitus[edit.id].status === "draft" ? "📝 Faire signer le quitus" : "✅ Voir le quitus signé"}</button>}
             {edit.id && !quitus[edit.id] && edit.status === "done" && <button className="btn-ghost w-full" onClick={() => router.push(`/app/quitus/nouveau?intervention=${edit.id}`)}>📝 Quitus d'intervention</button>}
-            {edit.status === "done" && !(edit.id && quitus[edit.id]) && <p className="text-xs text-slate-500">En enregistrant « Terminée », le quitus d'intervention s'ouvre pré-rempli pour la signature du client.</p>}
+            {edit.status === "done" && !(edit.id && quitus[edit.id]) && <p className="text-xs text-slate-500">« Terminée » enregistre l'intervention et ouvre le quitus pré-rempli pour la signature du client.</p>}
             {edit.address && <a className="btn-ghost w-full" target="_blank" rel="noreferrer" href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(edit.address)}`}>🧭 Itinéraire</a>}
-            <button className="btn-primary w-full" onClick={save}>Enregistrer</button>
+            <button className="btn-primary w-full" onClick={() => save()}>Enregistrer</button>
             {edit.id && <button className="btn-danger w-full" onClick={del}>Supprimer</button>}
           </div>
         </Modal>

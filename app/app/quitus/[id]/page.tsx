@@ -118,6 +118,23 @@ function Editor() {
     setR({ ...r!, photos });
   }
 
+  // Signature : enregistrement + clôture de l'intervention + envoi automatique au client
+  async function afterSign(name: string, sig: string, photo?: string | null) {
+    const done = await save({ status: "signed", signer_name: name, signature_data: sig, signer_photo: photo, signed_at: new Date().toISOString() });
+    if (!done) return;
+    if (done.intervention_id) await sb().from("interventions").update({ status: "done" }).eq("id", done.intervention_id);
+    const to = client?.email || done.client_snapshot?.email;
+    let msg = "✅ Quitus signé et enregistré";
+    if (to) {
+      setBusy(true);
+      try { const j = await sendMail({ type: "reception", id: done.id, to, pdfBase64: pdfToBase64(await buildReceptionPdf(done, company!, urls)) }); if (j.row) setR(j.row); msg += ` — envoyé à ${to}`; }
+      catch (e: any) { msg += ` — envoi impossible : ${e.message}`; }
+      setBusy(false);
+    }
+    flash(msg);
+    if (done.intervention_id) setTimeout(() => router.push("/app/planning"), 2500);
+  }
+
   async function lift(i: number) {
     const reserves = r!.reserves.map((x, j) => (j === i ? { ...x, lifted_at: x.lifted_at ? null : addDays(0) } : x));
     const all = reserves.every((x) => x.lifted_at);
@@ -264,7 +281,7 @@ function Editor() {
         <Modal title="Signature du client" onClose={() => setModal("")}>
           <SignaturePad defaultName={client?.name || r.client_snapshot?.name || ""} onCancel={() => setModal("")}
             agreement={`Je prononce la réception des travaux ${r.with_reserves ? "avec les réserves indiquées" : "sans réserve"} et je donne quitus à l'entreprise pour leur exécution${r.with_reserves ? ", sous réserve de la levée des réserves" : ""}.`}
-            onDone={async (name, sig, photo) => { setModal(""); await save({ status: "signed", signer_name: name, signature_data: sig, signer_photo: photo, signed_at: new Date().toISOString() }); }} />
+            onDone={async (name, sig, photo) => { setModal(""); await afterSign(name, sig, photo); }} />
         </Modal>
       )}
     </>
