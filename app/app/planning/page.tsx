@@ -96,9 +96,10 @@ function Planning() {
               </div>
               {items.length === 0 && <p className="text-xs text-slate-400">—</p>}
               {items.map((i) => (
-                <button key={i.id} onClick={() => setEdit(i)} className={`card mb-2 block w-full border-l-4 text-left ${i.status === "done" ? "border-l-green-500 opacity-60" : i.status === "canceled" ? "border-l-red-400 opacity-50" : "border-l-flame"}`}>
+                <button key={i.id} onClick={() => ((i as any).sav_id ? router.push(`/app/sav/${(i as any).sav_id}`) : setEdit(i))} className={`card mb-2 block w-full border-l-4 text-left ${i.status === "done" ? "border-l-green-500 opacity-60" : i.status === "canceled" ? "border-l-red-400 opacity-50" : "border-l-flame"}`}>
                   <p className="font-semibold">{new Date(i.starts_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · {i.title}</p>
                   <p className="text-sm text-slate-500">{[i.clients?.name, i.address].filter(Boolean).join(" · ")}</p>
+                  {(i as any).sav_id && <p className="text-xs font-semibold text-brand">🛠 Ouvrir la fiche SAV →</p>}
                   <p className="text-xs text-slate-400">👷 {i.technician || "Non attribué"}{i.id && quitus[i.id] ? (quitus[i.id].status === "draft" ? " · 📝 quitus à signer" : " · ✅ quitus signé") : ""}</p>
                 </button>
               ))}

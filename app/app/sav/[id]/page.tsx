@@ -120,7 +120,7 @@ function Editor() {
   async function schedule() {
     if (!t!.scheduled_at) return setErr("Choisissez la date du rendez-vous.");
     const saved = await save({ status: "planned" }); if (!saved) return;
-    await sb().from("interventions").insert({ assigned_to: (saved as any).assigned_to || null, title: `SAV ${saved.number}${saved.equipment?.type ? " — " + equipmentLabel(saved.equipment) : ""}`, client_id: saved.client_id, address: saved.address, starts_at: saved.scheduled_at, duration_min: 90, technician: saved.technician, notes: saved.problem });
+    await sb().from("interventions").insert({ sav_id: saved.id, assigned_to: (saved as any).assigned_to || null, title: `SAV ${saved.number}${saved.equipment?.type ? " — " + equipmentLabel(saved.equipment) : ""}`, client_id: saved.client_id, address: saved.address || [saved.client_snapshot?.address, saved.client_snapshot?.zip, saved.client_snapshot?.city].filter(Boolean).join(" ") || null, starts_at: saved.scheduled_at, duration_min: 90, technician: saved.technician, notes: saved.problem });
     flash("🗓 Rendez-vous ajouté au planning");
   }
 
