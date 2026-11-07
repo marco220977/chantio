@@ -5,6 +5,8 @@ import { sb } from "@/lib/supabase";
 
 const frError = (m: string) => /rate limit/i.test(m) ? "Trop d'inscriptions en peu de temps. Réessayez dans une heure (ou demandez au responsable de l'appli d'augmenter la limite)."
   : /registered|already/i.test(m) ? "Un compte existe déjà avec cet e-mail."
+  : /sending.*(confirmation|email)|smtp/i.test(m) ? "L'e-mail de confirmation n'a pas pu être envoyé. Réessayez dans quelques minutes ; si ça continue, contactez-nous."
+  : /invalid.*email|email.*invalid/i.test(m) ? "Adresse e-mail invalide."
   : /password/i.test(m) ? "Mot de passe trop court (6 caractères minimum)." : m;
 
 function Form() {
