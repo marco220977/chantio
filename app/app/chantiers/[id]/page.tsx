@@ -9,7 +9,9 @@ import { toDataUrl } from "@/lib/pdf";
 import { memberName, useCompany, type Member } from "@/components/CompanyContext";
 import Header from "@/components/Header";
 import Modal from "@/components/Modal";
-import { CH_STATUS, signedUrls, TAGS, uploadPhoto, type Chantier, type Entry } from "@/lib/chantiers";
+import { CH_STATUS, isVideo, posterOf, signedUrls, TAGS, uploadPhoto, type Chantier, type Entry } from "@/lib/chantiers";
+import { MediaButtons, MediaImg } from "@/components/Media";
+import { drawVideoBadge, mediaImage, prepareVideoLinks } from "@/lib/pdf-media";
 import type { Client } from "@/lib/types";
 
 function TeamPicker({ value, onChange, team }: { value: string[]; onChange: (v: string[]) => void; team: Member[] }) {
@@ -118,7 +120,7 @@ function Detail({ id }: { id: string }) {
     try {
       const paths: string[] = [];
       for (let i = 0; i < files.length; i++) {
-        setBusy(`Envoi photo ${i + 1}/${files.length}…`);
+        setBusy(`Envoi ${i + 1}/${files.length}${isVideo(files[i].name) || files[i].type.startsWith("video/") ? " (vidéo, patientez)" : ""}…`);
         paths.push(await uploadPhoto(company!.id, c!.id, files[i]));
       }
       setBusy("Enregistrement…");
@@ -126,7 +128,7 @@ function Detail({ id }: { id: string }) {
       const { data: me } = await sb().from("members").select("full_name").eq("user_id", user?.id).maybeSingle();
       const { error } = await sb().from("chantier_entries").insert({ chantier_id: c!.id, tag, text: text.trim() || null, photos: paths, author: me?.full_name || null });
       if (error) throw error;
-      if (!c!.cover_path && paths[0]) await sb().from("chantiers").update({ cover_path: paths[0] }).eq("id", c!.id);
+      if (!c!.cover_path && paths[0]) await sb().from("chantiers").update({ cover_path: isVideo(paths[0]) ? posterOf(paths[0]) : paths[0] }).eq("id", c!.id);
       if (c!.status === "planned") await sb().from("chantiers").update({ status: "in_progress" }).eq("id", c!.id);
       setFiles([]); setText("");
       await load();
@@ -136,9 +138,9 @@ function Detail({ id }: { id: string }) {
 
   async function delEntry(e: Entry) {
     if (!confirm("Supprimer cette entrée et ses photos ?")) return;
-    if (e.photos.length) await sb().storage.from("chantiers").remove(e.photos);
+    if (e.photos.length) await sb().storage.from("chantiers").remove(e.photos.flatMap((p) => (isVideo(p) ? [p, posterOf(p)] : [p])));
     await sb().from("chantier_entries").delete().eq("id", e.id);
-    if (c!.cover_path && e.photos.includes(c!.cover_path)) await sb().from("chantiers").update({ cover_path: null }).eq("id", c!.id);
+    if (c!.cover_path && e.photos.some((p) => p === c!.cover_path || posterOf(p) === c!.cover_path)) await sb().from("chantiers").update({ cover_path: null }).eq("id", c!.id);
     setViewer(null); load();
   }
 
@@ -164,6 +166,7 @@ function Detail({ id }: { id: string }) {
   async function report() {
     setBusy("Création du rapport…");
     try {
+      await prepareVideoLinks(entries.flatMap((e) => e.photos));
       const pdf = new jsPDF({ unit: "mm", format: "a4" });
       const W = 210, M = 15;
       pdf.setFont("helvetica", "bold").setFontSize(16).setTextColor(29, 78, 216).text("RAPPORT DE CHANTIER", M, 20);
@@ -187,7 +190,7 @@ function Detail({ id }: { id: string }) {
         }
         let rowH = 0;
         for (let i = 0; i < e.photos.length; i++) {
-          const img = await toDataUrl(urls[e.photos[i]]);
+          const img = await mediaImage(e.photos[i], urls);
           if (!img) continue;
           const props = pdf.getImageProperties(img);
           const ratio = props.height / props.width;
@@ -196,6 +199,7 @@ function Detail({ id }: { id: string }) {
           if (i % 2 === 0) { if (y + h > 285) { pdf.addPage(); y = M; } rowH = 0; }
           const x = i % 2 === 0 ? M : M + 93;
           pdf.addImage(img, "JPEG", x, y, w, h);
+          await drawVideoBadge(pdf, e.photos[i], x, y, w, h);
           rowH = Math.max(rowH, h);
           if (i % 2 === 1 || i === e.photos.length - 1) y += rowH + 4;
         }
@@ -252,21 +256,18 @@ function Detail({ id }: { id: string }) {
             <div className="grid grid-cols-4 gap-1.5">
               {previews.map((u, i) => (
                 <div key={u} className="relative aspect-square overflow-hidden rounded-lg">
-                  <img src={u} alt="" className="h-full w-full object-cover" />
+                  {files[i]?.type.startsWith("video/") ? <><video src={u} muted playsInline className="h-full w-full object-cover" /><span className="absolute inset-0 flex items-center justify-center text-white">▶</span></> : <img src={u} alt="" className="h-full w-full object-cover" />}
                   <button className="absolute right-0.5 top-0.5 rounded-full bg-black/60 px-1.5 text-xs text-white" onClick={() => setFiles(files.filter((_, j) => j !== i))}>×</button>
                 </div>
               ))}
             </div>
           )}
-          <div className="grid grid-cols-2 gap-2">
-            <label className="btn-ghost cursor-pointer">📷 Photo<input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { if (e.target.files) setFiles([...files, ...Array.from(e.target.files)]); e.target.value = ""; }} /></label>
-            <label className="btn-ghost cursor-pointer">🖼 Galerie<input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { if (e.target.files) setFiles([...files, ...Array.from(e.target.files)]); e.target.value = ""; }} /></label>
-          </div>
+          <MediaButtons onFiles={(f) => setFiles([...files, ...f])} />
           <button className="btn-brand w-full py-3" disabled={!!busy || (!files.length && !text.trim())} onClick={publish}>{busy || "Ajouter au journal"}</button>
         </section>
 
         <div className="grid grid-cols-2 rounded-xl bg-slate-200 p-1">
-          {[["journal", "Journal"], ["photos", `Photos (${entries.reduce((s, e) => s + e.photos.length, 0)})`]].map(([k, l]) => (
+          {[["journal", "Journal"], ["photos", `Photos et vidéos (${entries.reduce((s, e) => s + e.photos.length, 0)})`]].map(([k, l]) => (
             <button key={k} onClick={() => setTab(k as any)} className={`rounded-lg py-2 text-sm font-semibold ${tab === k ? "bg-white shadow" : "text-slate-600"}`}>{l}</button>
           ))}
         </div>
@@ -290,7 +291,7 @@ function Detail({ id }: { id: string }) {
                       <div className="grid grid-cols-3 gap-1.5">
                         {e.photos.map((p) => (
                           <button key={p} className="aspect-square overflow-hidden rounded-lg bg-slate-100" onClick={() => { setTagFilter("all"); setViewer(allPhotosIndex(entries, p)); }}>
-                            {urls[p] && <img src={urls[p]} alt="" loading="lazy" className="h-full w-full object-cover" />}
+                            <MediaImg path={p} urls={urls} />
                           </button>
                         ))}
                       </div>
@@ -312,7 +313,7 @@ function Detail({ id }: { id: string }) {
             <div className="grid grid-cols-3 gap-1.5">
               {allPhotos.map((p, i) => (
                 <button key={p.path} className="aspect-square overflow-hidden rounded-lg bg-slate-100" onClick={() => setViewer(i)}>
-                  {urls[p.path] && <img src={urls[p.path]} alt="" loading="lazy" className="h-full w-full object-cover" />}
+                  <MediaImg path={p.path} urls={urls} />
                 </button>
               ))}
             </div>
@@ -330,7 +331,9 @@ function Detail({ id }: { id: string }) {
             <button className="text-2xl" onClick={() => setViewer(null)}>×</button>
           </div>
           <div className="flex flex-1 items-center justify-center" onClick={(e) => e.stopPropagation()}>
-            <img src={urls[allPhotos[viewer].path]} alt="" className="max-h-full max-w-full object-contain" />
+            {isVideo(allPhotos[viewer].path)
+              ? <video key={allPhotos[viewer].path} src={urls[allPhotos[viewer].path]} controls autoPlay playsInline className="max-h-full max-w-full" />
+              : <img src={urls[allPhotos[viewer].path]} alt="" className="max-h-full max-w-full object-contain" />}
           </div>
           {allPhotos[viewer].entry.text && <p className="p-3 text-sm text-white" onClick={(e) => e.stopPropagation()}>{allPhotos[viewer].entry.text}</p>}
           <div className="grid grid-cols-3 gap-2 p-3" onClick={(e) => e.stopPropagation()}>

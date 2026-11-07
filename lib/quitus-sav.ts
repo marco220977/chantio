@@ -4,7 +4,8 @@ import autoTable from "jspdf-autotable";
 import type { Company } from "./types";
 import type { Equipment } from "./maintenance";
 import { dateFr } from "./calc";
-import { toDataUrl } from "./pdf";
+import { drawVideoBadge, mediaImage, prepareVideoLinks } from "./pdf-media";
+import { isVideo } from "./chantiers";
 import { box, clientLines, equipLines, footer, header, paragraph, signatures } from "./pdf-maintenance";
 
 export type Reserve = { label: string; deadline?: string; lifted_at?: string | null };
@@ -59,14 +60,17 @@ async function photosBlock(pdf: jsPDF, y: number, paths: string[], urls: Record<
   const M = 15;
   const list = paths.filter((p) => urls[p]).slice(0, max);
   if (!list.length) return y;
+  await prepareVideoLinks(list);
   if (y + 50 > 280) { pdf.addPage(); y = M; }
-  pdf.setFont("helvetica", "bold").setFontSize(9.5).text("Photos", M, y); y += 3;
+  pdf.setFont("helvetica", "bold").setFontSize(9.5).text(list.some(isVideo) ? "Photos et vidéos" : "Photos", M, y); y += 3;
   let x = M;
   for (const p of list) {
-    const img = await toDataUrl(urls[p]); if (!img) continue;
+    const img = await mediaImage(p, urls); if (!img) continue;
     if (x + 42 > 196) { x = M; y += 45; if (y + 42 > 280) { pdf.addPage(); y = M; } }
     const pr = pdf.getImageProperties(img); const h = 40, w = Math.min(42, (pr.width / pr.height) * h);
-    pdf.addImage(img, "JPEG", x, y, w, h); x += 45;
+    pdf.addImage(img, "JPEG", x, y, w, h);
+    await drawVideoBadge(pdf, p, x, y, w, h);
+    x += 45;
   }
   return y + 45;
 }

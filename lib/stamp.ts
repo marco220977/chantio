@@ -79,12 +79,19 @@ async function address(lat: number, lon: number): Promise<string> {
 }
 
 // Redimensionne la photo et incruste date/heure + lieu en bas de l'image
-export async function stampPhoto(file: File, max = 1600): Promise<Blob> {
-  const exif = await readExif(file);
-  const recent = !exif.date || Math.abs(Date.now() - exif.date.getTime()) < 10 * 60_000;
-  let lat = exif.lat, lon = exif.lon, acc: number | undefined;
-  if (lat == null && recent) { const p = await currentPosition(); if (p) { lat = p.lat; lon = p.lon; acc = p.acc; } }
-  const when = exif.date || new Date((file as any).lastModified || Date.now());
+type StampOpts = { when: Date; pos: { lat: number; lon: number; acc?: number } | null; prefix?: string };
+
+export async function stampPhoto(file: Blob, max = 1600, opts?: StampOpts): Promise<Blob> {
+  let lat: number | undefined, lon: number | undefined, acc: number | undefined, when: Date;
+  if (opts) {
+    when = opts.when; if (opts.pos) { lat = opts.pos.lat; lon = opts.pos.lon; acc = opts.pos.acc; }
+  } else {
+    const exif = await readExif(file);
+    const recent = !exif.date || Math.abs(Date.now() - exif.date.getTime()) < 10 * 60_000;
+    lat = exif.lat; lon = exif.lon;
+    if (lat == null && recent) { const p = await currentPosition(); if (p) { lat = p.lat; lon = p.lon; acc = p.acc; } }
+    when = exif.date || new Date((file as any).lastModified || Date.now());
+  }
   const addr = lat != null && lon != null ? await address(lat, lon) : "";
 
   const img = await createImageBitmap(file);
@@ -95,7 +102,7 @@ export async function stampPhoto(file: File, max = 1600): Promise<Blob> {
 
   const fs = Math.max(13, Math.round(Math.min(c.width, c.height) / 34));
   const lines = [
-    "🕒 " + when.toLocaleString("fr-FR", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+    (opts?.prefix || "") + "🕒 " + when.toLocaleString("fr-FR", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" }),
     lat != null && lon != null ? `📍 ${addr ? addr + " · " : ""}${lat.toFixed(5)}, ${lon.toFixed(5)}${acc ? ` (±${acc} m)` : ""}` : "📍 Position non disponible",
   ];
   ctx.font = `600 ${fs}px Arial, sans-serif`;

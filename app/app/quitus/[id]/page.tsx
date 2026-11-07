@@ -12,7 +12,8 @@ import SignaturePad from "@/components/SignaturePad";
 import { buildReceptionPdf, type Reception } from "@/lib/quitus-sav";
 import { pdfToBase64, shareOrSave } from "@/lib/pdf-maintenance";
 import { askEmail, sendMail, snapshotOf } from "@/lib/send";
-import { signedUrls, uploadPhoto } from "@/lib/chantiers";
+import { removeMedia, signedUrls, uploadPhoto } from "@/lib/chantiers";
+import { MediaButtons, MediaGrid } from "@/components/Media";
 import type { Client } from "@/lib/types";
 
 function Editor() {
@@ -119,12 +120,12 @@ function Editor() {
     return data;
   }
 
-  async function addPhotos(files: FileList) {
+  async function addPhotos(files: File[] | FileList) {
     const saved = r!.id ? r! : await save(); if (!saved) return;
     try {
       const paths = [...(saved.photos || [])];
       const list = Array.from(files);
-      for (let i = 0; i < list.length; i++) { setUpl(`Envoi photo ${i + 1}/${list.length}…`); paths.push(await uploadPhoto(company!.id, `quitus-${saved.id}`, list[i])); }
+      for (let i = 0; i < list.length; i++) { setUpl(`Envoi ${i + 1}/${list.length}…`); paths.push(await uploadPhoto(company!.id, `quitus-${saved.id}`, list[i])); }
       const { data, error } = await sb().from("receptions").update({ photos: paths }).eq("id", saved.id).select().single();
       if (error) throw error;
       setR({ ...r!, ...saved, photos: data.photos });
@@ -133,8 +134,8 @@ function Editor() {
     setUpl("");
   }
   async function removePhoto(p: string) {
-    if (!confirm("Supprimer cette photo ?")) return;
-    if (p.includes("/quitus-")) await sb().storage.from("chantiers").remove([p]);
+    if (!confirm("Supprimer ce média ?")) return;
+    if (p.includes("/quitus-")) await removeMedia(p);
     const photos = (r!.photos || []).filter((x) => x !== p);
     await sb().from("receptions").update({ photos }).eq("id", r!.id);
     setR({ ...r!, photos });
@@ -259,28 +260,12 @@ function Editor() {
         </section>
 
         <section className="card space-y-3">
-          <h2 className="font-bold">Photos</h2>
-          {(r.photos || []).length > 0 && (
-            <div className="grid grid-cols-4 gap-1.5">
-              {(r.photos || []).map((p) => (
-                <div key={p} className="relative aspect-square overflow-hidden rounded-lg bg-slate-100">
-                  {urls[p] && <a href={urls[p]} target="_blank" rel="noreferrer"><img src={urls[p]} alt="" className="h-full w-full object-cover" /></a>}
-                  {canPhoto && <button className="absolute right-0.5 top-0.5 rounded-full bg-black/60 px-1.5 text-xs text-white" onClick={() => removePhoto(p)}>×</button>}
-                </div>
-              ))}
-            </div>
-          )}
+          <h2 className="font-bold">Photos et vidéos</h2>
+          {(r.photos || []).length > 0 && <MediaGrid paths={r.photos || []} urls={urls} onRemove={canPhoto ? removePhoto : undefined} />}
           {!(r.photos || []).length && !canPhoto && <p className="text-sm text-slate-400">Aucune photo.</p>}
-          {canPhoto && (
-            <div className="grid grid-cols-2 gap-2">
-              <label className="btn-ghost cursor-pointer">📷 Prendre une photo
-                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { if (e.target.files?.length) addPhotos(e.target.files); e.target.value = ""; }} /></label>
-              <label className="btn-ghost cursor-pointer">🖼 Galerie
-                <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { if (e.target.files?.length) addPhotos(e.target.files); e.target.value = ""; }} /></label>
-            </div>
-          )}
+          {canPhoto && <MediaButtons onFiles={addPhotos} />}
           {upl && <p className="text-sm text-slate-500">{upl}</p>}
-          {canPhoto && <p className="text-xs text-slate-400">Toutes les photos sont ajoutées au procès-verbal PDF.</p>}
+          {canPhoto && <p className="text-xs text-slate-400">Toutes les photos sont ajoutées au procès-verbal PDF ; chaque vidéo y figure avec un QR code pour la regarder.</p>}
         </section>
 
         <section className="card space-y-3">

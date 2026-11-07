@@ -13,7 +13,8 @@ import EquipmentForm from "@/components/EquipmentForm";
 import { buildSavPdf, ORIGINS, SAV_STATUS, WARRANTY, warrantyFromReception, type Ticket } from "@/lib/quitus-sav";
 import { equipmentLabel } from "@/lib/maintenance";
 import { pdfToBase64, shareOrSave } from "@/lib/pdf-maintenance";
-import { signedUrls, uploadPhoto } from "@/lib/chantiers";
+import { removeMedia, signedUrls, uploadPhoto } from "@/lib/chantiers";
+import { MediaButtons, MediaGrid } from "@/components/Media";
 import { askEmail, sendMail, snapshotOf } from "@/lib/send";
 import type { Client } from "@/lib/types";
 
@@ -99,12 +100,12 @@ function Editor() {
     return data;
   }
 
-  async function addPhotos(files: FileList) {
+  async function addPhotos(files: File[] | FileList) {
     const saved = t!.id ? t! : await save(); if (!saved) return;
     try {
       const paths = [...saved.photos];
       const list = Array.from(files);
-      for (let i = 0; i < list.length; i++) { setBusy(`Envoi photo ${i + 1}/${list.length}…`); paths.push(await uploadPhoto(company!.id, `sav-${saved.id}`, list[i])); }
+      for (let i = 0; i < list.length; i++) { setBusy(`Envoi ${i + 1}/${list.length}…`); paths.push(await uploadPhoto(company!.id, `sav-${saved.id}`, list[i])); }
       const done = await save({ ...saved, photos: paths });
       if (done) setUrls(await signedUrls(done.photos));
     } catch (e: any) { setErr(e.message); }
@@ -112,8 +113,8 @@ function Editor() {
   }
 
   async function removePhoto(p: string) {
-    if (!confirm("Supprimer cette photo ?")) return;
-    await sb().storage.from("chantiers").remove([p]);
+    if (!confirm("Supprimer ce média ?")) return;
+    await removeMedia(p);
     await save({ photos: t!.photos.filter((x) => x !== p) });
   }
 
@@ -211,23 +212,9 @@ function Editor() {
             <div><label className="label">Travaux réalisés</label><textarea className="input text-sm" rows={3} disabled={closed} value={t.actions || ""} onChange={(e) => set({ actions: e.target.value })} /></div>
             <div><label className="label">Pièces remplacées / à commander</label><textarea className="input text-sm" rows={2} disabled={closed} value={t.parts || ""} onChange={(e) => set({ parts: e.target.value })} /></div>
             <div>
-              <span className="label">Photos</span>
-              <div className="grid grid-cols-4 gap-1.5">
-                {t.photos.map((p) => (
-                  <div key={p} className="relative aspect-square overflow-hidden rounded-lg bg-slate-100">
-                    {urls[p] && <a href={urls[p]} target="_blank" rel="noreferrer"><img src={urls[p]} alt="" className="h-full w-full object-cover" /></a>}
-                    {!closed && <button className="absolute right-0.5 top-0.5 rounded-full bg-black/60 px-1.5 text-xs text-white" onClick={() => removePhoto(p)}>×</button>}
-                  </div>
-                ))}
-              </div>
-              {!closed && (
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  <label className="btn-ghost cursor-pointer">📷 Prendre une photo
-                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { if (e.target.files?.length) addPhotos(e.target.files); e.target.value = ""; }} /></label>
-                  <label className="btn-ghost cursor-pointer">🖼 Galerie
-                    <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { if (e.target.files?.length) addPhotos(e.target.files); e.target.value = ""; }} /></label>
-                </div>
-              )}
+              <span className="label">Photos et vidéos</span>
+              <MediaGrid paths={t.photos} urls={urls} onRemove={closed ? undefined : removePhoto} />
+              {!closed && <div className="mt-2"><MediaButtons onFiles={addPhotos} /></div>}
               {busy && <p className="mt-1 text-sm text-slate-500">{busy}</p>}
             </div>
           </section>
