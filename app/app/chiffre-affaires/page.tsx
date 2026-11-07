@@ -69,12 +69,12 @@ export default function CA() {
   const monthlyVat = MONTHS.map((_, m) => vatOf(usable.filter((r) => inMonth(r, m))));
   const totalVat = monthlyVat.reduce((a, v) => a + v, 0);
   const byRate = (() => {
-    const acc: Record<string, { base: number; vat: number }> = {};
+    const acc: Record<string, { base: number; vat: number }> = { "20": { base: 0, vat: 0 }, "10": { base: 0, vat: 0 }, "5.5": { base: 0, vat: 0 } };
     for (const r of usable.filter((x) => inMonth(x, vatMonth))) {
       const t = computeTotals(r.lines || [], r.discount_pct, false);
       for (const [rate, v] of Object.entries(t.byRate)) { acc[rate] ??= { base: 0, vat: 0 }; acc[rate].base += v.base; acc[rate].vat += v.vat; }
     }
-    return Object.entries(acc).filter(([, v]) => Math.abs(v.base) > 0.001).sort((a, b) => Number(b[0]) - Number(a[0]));
+    return Object.entries(acc).filter(([k, v]) => ["20", "10", "5.5"].includes(k) || Math.abs(v.base) > 0.001).sort((a, b) => Number(b[0]) - Number(a[0]));
   })();
   const yearly = years.map((y) => ({ name: String(y), current: y === new Date().getFullYear(), value: usable.filter((r) => dateOf(r)?.startsWith(String(y))).reduce((s, r) => s + val(r), 0) }));
 
@@ -133,12 +133,12 @@ export default function CA() {
                   {MONTHS.map((m, i) => <option key={m} value={i}>{m} {year}</option>)}
                 </select>
               </div>
-              {byRate.length === 0 ? <p className="text-sm text-slate-500">Aucune TVA sur la période.</p> : (
+              {byRate.length === 0 ? null : (
                 <table className="w-full text-sm">
                   <thead><tr className="text-left text-xs uppercase text-slate-500"><th className="py-1">Taux</th><th className="py-1 text-right">Base HT</th><th className="py-1 text-right">TVA</th></tr></thead>
                   <tbody>
                     {byRate.map(([rate, v]) => (
-                      <tr key={rate} className="border-t border-slate-100"><td className="py-1.5">{rate.replace(".", ",")} %</td><td className="py-1.5 text-right tabular-nums">{eur(v.base)}</td><td className="py-1.5 text-right tabular-nums">{eur(v.vat)}</td></tr>
+                      <tr key={rate} className={`border-t border-slate-100 ${Math.abs(v.base) < 0.001 ? "text-slate-400" : ""}`}><td className="py-1.5">{rate.replace(".", ",")} %</td><td className="py-1.5 text-right tabular-nums">{eur(v.base)}</td><td className="py-1.5 text-right tabular-nums">{eur(v.vat)}</td></tr>
                     ))}
                     <tr className="border-t-2 font-bold"><td className="py-1.5">Total</td><td className="py-1.5 text-right tabular-nums">{eur(byRate.reduce((a, [, v]) => a + v.base, 0))}</td><td className="py-1.5 text-right tabular-nums">{eur(byRate.reduce((a, [, v]) => a + v.vat, 0))}</td></tr>
                   </tbody>
