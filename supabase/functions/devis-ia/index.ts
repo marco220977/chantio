@@ -33,8 +33,22 @@ Règles :
 Réponds UNIQUEMENT avec un JSON, sans texte autour :
 {"title":"titre court du chantier","lines":[{"id":null,"label":"","qty":1,"unit":"u","unit_price":0,"vat_rate":10,"estimate":false}],"notes":"remarques utiles pour l'artisan (points à vérifier sur place), une ou deux phrases","questions":["question éventuelle à poser au client"]}`;
 
+
+// Accès réservé aux comptes en essai ou abonnés
+async function subscriptionOk(req: Request): Promise<boolean> {
+  try {
+    const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/rest/v1/rpc/my_company_active`, {
+      method: "POST", body: "{}",
+      headers: { Authorization: req.headers.get("Authorization") || "", apikey: Deno.env.get("SUPABASE_ANON_KEY") || "", "content-type": "application/json" },
+    });
+    return (await r.json()) !== false;
+  } catch { return true; }
+}
+const SUB_MSG = "Essai gratuit terminé : abonnez-vous (Menu → Abonnement) pour utiliser l'intelligence artificielle.";
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  if (!(await subscriptionOk(req))) return json({ error: SUB_MSG }, 402);
   const key = Deno.env.get("ANTHROPIC_API_KEY");
   if (!key) return json({ error: "Clé ANTHROPIC_API_KEY manquante" }, 500);
   const { description, image, catalog, vat } = await req.json().catch(() => ({}));

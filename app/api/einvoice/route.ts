@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/config";
+import { SUPABASE_URL, SUPABASE_ANON_KEY, SUBSCRIPTION_REQUIRED } from "@/lib/config";
 import { buildFacturX, channelOf, eReportingPayload, validateEInvoice } from "@/lib/einvoice";
 import { provider } from "@/lib/einvoice-providers";
 
@@ -19,6 +19,10 @@ export async function POST(req: Request) {
   const { action, docId, pdfBase64 } = await req.json();
   const { data: co } = await s.from("companies").select("*").single();
   if (!co) return NextResponse.json({ error: "Entreprise introuvable" }, { status: 404 });
+  if (["activate", "send"].includes(action)) {
+    const { data: active } = await s.rpc("my_company_active");
+    if (active === false) return NextResponse.json({ error: SUBSCRIPTION_REQUIRED }, { status: 402 });
+  }
   const p = provider();
   const log = (row: any) => s.from("einvoice_events").insert({ provider: p.name, ...row });
 

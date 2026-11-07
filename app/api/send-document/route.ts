@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/config";
+import { SUPABASE_URL, SUPABASE_ANON_KEY, SUBSCRIPTION_REQUIRED } from "@/lib/config";
 
 export const maxDuration = 30;
 
@@ -17,6 +17,8 @@ export async function POST(req: Request) {
   const s = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { global: { headers: { Authorization: `Bearer ${token}` } }, auth: { persistSession: false } });
 
   const input = await req.json();
+  const { data: active } = await s.rpc("my_company_active");
+  if (active === false) return NextResponse.json({ error: SUBSCRIPTION_REQUIRED }, { status: 402 });
   const { docId, pdfBase64, to, origin } = input;
   if (input.type === "invite") return sendInvite(s, input);
   if (input.type === "po") return sendPo(s, input);

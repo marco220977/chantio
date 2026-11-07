@@ -4,8 +4,11 @@ import { currentUser, sb } from "@/lib/supabase";
 import type { Company } from "@/lib/types";
 
 export type Member = { user_id: string; company_id: string; role: "owner" | "supervisor" | "technician"; full_name?: string | null; email?: string | null };
-type Ctx = { company: Company | null; me: Member | null; team: Member[]; isSup: boolean; loaded: boolean; reload: () => Promise<void> };
-const C = createContext<Ctx>({ company: null, me: null, team: [], isSup: false, loaded: false, reload: async () => {} });
+type Ctx = { company: Company | null; me: Member | null; team: Member[]; isSup: boolean; loaded: boolean; active: boolean; reload: () => Promise<void> };
+const C = createContext<Ctx>({ company: null, me: null, team: [], isSup: false, loaded: false, active: true, reload: async () => {} });
+
+// Essai en cours ou abonnement actif (sinon : consultation seule)
+export const isActive = (c?: Company | null) => !c || c.plan === "pro" || new Date(c.trial_ends_at || 0).getTime() > Date.now();
 
 export const ROLE_LABEL: Record<string, string> = { owner: "Superviseur (titulaire)", supervisor: "Superviseur", technician: "Technicien" };
 export const memberName = (m?: Member | null) => m?.full_name || m?.email || "—";
@@ -31,6 +34,6 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
   }, []);
   useEffect(() => { reload(); }, [reload]);
   const isSup = !!me && me.role !== "technician";
-  return <C.Provider value={{ company, me, team, isSup, loaded, reload }}>{children}</C.Provider>;
+  return <C.Provider value={{ company, me, team, isSup, loaded, active: isActive(company), reload }}>{children}</C.Provider>;
 }
 export const useCompany = () => useContext(C);

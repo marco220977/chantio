@@ -24,8 +24,14 @@ const TECH_TABS = [
 const SUP_ONLY = ["/app/devis", "/app/factures", "/app/doc", "/app/chiffre-affaires", "/app/export", "/app/abonnement", "/app/catalogue", "/app/equipe", "/app/commandes"];
 
 function TrialBanner() {
-  const { company, isSup } = useCompany();
-  if (!company || !isSup || company.plan === "pro") return null;
+  const { company, isSup, active } = useCompany();
+  if (!company || company.plan === "pro") return null;
+  if (!active) return (
+    <Link href={isSup ? "/app/abonnement" : "/app"} className="block bg-red-600 px-4 py-2 text-center text-sm font-semibold text-white">
+      {isSup ? "🔒 Essai terminé : consultation seule. Abonnez-vous pour créer et envoyer des documents →" : "🔒 Abonnement de l'entreprise inactif : consultation seule. Prévenez votre responsable."}
+    </Link>
+  );
+  if (!isSup) return null;
   const days = Math.ceil((new Date(company.trial_ends_at || 0).getTime() - Date.now()) / 86400000);
   return (
     <Link href="/app/abonnement" className="block bg-gradient-to-r from-ink to-flame px-4 py-2 text-center text-sm font-semibold text-white">

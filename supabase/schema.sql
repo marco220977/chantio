@@ -393,3 +393,6 @@ alter table companies add column if not exists email_after_sign text not null de
 -- interventions.sav_id (lien planning → fiche SAV)
 alter table interventions add column if not exists sav_id uuid references sav_tickets(id) on delete set null;
 -- interventions.billable/price_ht/vat_rate/invoice_id + fonction invoice_from_intervention (voir migration intervention_billable)
+-- Abonnement obligatoire après l'essai (migrations subscription_enforcement + cron_only_active_companies) :
+-- company_active(), my_company_active(), trigger require_subscription() sur documents/receptions/maintenance_reports/contracts/
+-- sav_tickets/purchase_orders/interventions/chantiers, next_number() bloqué, cron limité aux comptes actifs.

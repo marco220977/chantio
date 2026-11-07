@@ -22,8 +22,10 @@ export default function Page() {
 
       <h2>3. Essai gratuit et abonnement</h2>
       <ul>
-        <li>Tout nouveau compte bénéficie d'un essai gratuit de 14 jours, sans engagement ni moyen de paiement.</li>
-        <li>À l'issue de l'essai, l'accès complet nécessite un abonnement au prix de {L.price}, payable mensuellement et d'avance par carte bancaire via le prestataire Stripe.</li>
+        <li>Tout nouveau compte bénéficie d'un essai gratuit de 14 jours, porté à 30 jours en cas d'inscription par un lien de parrainage, sans engagement ni moyen de paiement.</li>
+        <li>À l'issue de l'essai, la poursuite de l'utilisation nécessite un abonnement au prix de {L.price}, payable mensuellement et d'avance par carte bancaire via le prestataire Stripe.</li>
+        <li>Sans abonnement actif à la fin de l'essai, ou après la fin d'un abonnement résilié, le compte passe en consultation seule : il n'est plus possible de créer, numéroter, émettre, envoyer ou faire signer des documents (devis, factures, avoirs, contrats, attestations, quitus, fiches SAV, bons de commande), ni de planifier des interventions ou d'utiliser les fonctions automatiques (relances, rappels, demandes d'avis, intelligence artificielle, transmission de factures électroniques).</li>
+        <li>En consultation seule, l'Abonné conserve l'accès à l'ensemble de ses documents et données : il peut les consulter, les télécharger au format PDF, réaliser l'export comptable, enregistrer les paiements reçus sur ses factures déjà émises et supprimer son compte. Les fonctionnalités sont rétablies dès la souscription de l'abonnement.</li>
         <li>L'abonnement est sans engagement de durée. Il est reconduit chaque mois et peut être résilié à tout moment depuis l'espace « Abonnement » ; la résiliation prend effet à la fin de la période payée. Aucun remboursement au prorata n'est dû.</li>
         <li>En cas d'échec de paiement, l'Éditeur peut suspendre l'accès après relance restée sans effet pendant 15 jours.</li>
         <li>L'Éditeur peut modifier ses tarifs moyennant un préavis de 30 jours par e-mail ; l'Abonné peut résilier avant l'entrée en vigueur du nouveau tarif.</li>
