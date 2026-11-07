@@ -43,6 +43,8 @@ function Editor() {
       const chId = params.get("chantier");
       const ivId = params.get("intervention");
       if (ivId) {
+        const { data: ex } = await s.from("receptions").select("id").eq("intervention_id", ivId).limit(1);
+        if (ex?.[0]) { router.replace(`/app/quitus/${ex[0].id}`); return; }
         const { data: iv } = await s.from("interventions").select("*").eq("id", ivId).single();
         if (iv) {
           const day = new Date(iv.starts_at); day.setMinutes(day.getMinutes() - day.getTimezoneOffset());
@@ -57,7 +59,17 @@ function Editor() {
       }
       if (chId) {
         const { data: ch } = await s.from("chantiers").select("*").eq("id", chId).single();
-        if (ch) { Object.assign(base, { chantier_id: ch.id, client_id: ch.client_id, client_snapshot: ch.client_snapshot, address: ch.address, works: ch.title }); docId = docId || ch.document_id; }
+        if (ch) {
+          // Quitus déjà commencé pour ce chantier → on le rouvre
+          const { data: ex } = await s.from("receptions").select("id").eq("chantier_id", ch.id).order("created_at", { ascending: false }).limit(1);
+          if (ex?.[0]) { router.replace(`/app/quitus/${ex[0].id}`); return; }
+          const { data: ents } = await s.from("chantier_entries").select("text, photos, tag, created_at").eq("chantier_id", ch.id).order("created_at");
+          const notes = (ents || []).filter((e: any) => e.text && ["apres", "reception", "pendant"].includes(e.tag)).map((e: any) => `• ${e.text}`);
+          Object.assign(base, { chantier_id: ch.id, client_id: ch.client_id, client_snapshot: ch.client_snapshot, address: ch.address,
+            works: [ch.title?.trim(), ...notes].filter(Boolean).join("\n"), works_end_date: ch.end_date || base.works_end_date,
+            photos: (ents || []).flatMap((e: any) => e.photos || []) });
+          docId = docId || ch.document_id;
+        }
       }
       if (docId) {
         const { data: d } = await s.from("documents").select("*").eq("id", docId).single();
@@ -68,6 +80,7 @@ function Editor() {
         });
       }
       setR(base);
+      if (base.photos?.length) setUrls(await signedUrls(base.photos));
     })();
   }, [id, isNew, params]);
 
@@ -112,7 +125,7 @@ function Editor() {
   }
   async function removePhoto(p: string) {
     if (!confirm("Supprimer cette photo ?")) return;
-    await sb().storage.from("chantiers").remove([p]);
+    if (p.includes("/quitus-")) await sb().storage.from("chantiers").remove([p]);
     const photos = (r!.photos || []).filter((x) => x !== p);
     await sb().from("receptions").update({ photos }).eq("id", r!.id);
     setR({ ...r!, photos });

@@ -86,6 +86,7 @@ function Detail({ id }: { id: string }) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [tab, setTab] = useState<"journal" | "photos">("journal");
+  const [quitus, setQuitus] = useState<{ id: string; status: string } | null>(null);
   const [tagFilter, setTagFilter] = useState("all");
   const [tag, setTag] = useState("pendant");
   const [text, setText] = useState("");
@@ -98,6 +99,7 @@ function Detail({ id }: { id: string }) {
   async function load() {
     const { data } = await sb().from("chantiers").select("*").eq("id", id).single();
     setC(data);
+    sb().from("receptions").select("id, status").eq("chantier_id", id).order("created_at", { ascending: false }).limit(1).then(({ data }) => setQuitus(data?.[0] || null));
     const { data: e } = await sb().from("chantier_entries").select("*").eq("chantier_id", id).order("created_at", { ascending: false });
     setEntries(e || []);
     const paths = (e || []).flatMap((x: Entry) => x.photos);
@@ -234,7 +236,7 @@ function Detail({ id }: { id: string }) {
           {c.status === "planned" && <button className="btn-primary" onClick={() => setStatus("in_progress")}>▶️ Démarrer</button>}
           {c.status === "in_progress" && <button className="btn-primary" onClick={() => setStatus("done")}>✅ Terminer</button>}
           {c.status === "done" && <button className="btn-ghost" onClick={() => setStatus("in_progress")}>Rouvrir</button>}
-          <Link href={`/app/quitus/nouveau?chantier=${c.id}`} className="btn-ghost col-span-2">✅ Quitus de fin de travaux</Link>
+          <Link href={`/app/quitus/nouveau?chantier=${c.id}`} className="btn-ghost col-span-2">✅ Quitus de fin de travaux{quitus ? (quitus.status === "draft" ? " (à signer)" : " (signé)") : ""}</Link>
           <button className="btn-ghost" disabled={!!busy || !entries.length} onClick={report}>📄 Rapport photo</button>
         </div>
 
