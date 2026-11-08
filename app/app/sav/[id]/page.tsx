@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import ClientPicker from "@/components/ClientPicker";
 import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { currentUser, sb } from "@/lib/supabase";
@@ -164,9 +165,9 @@ function Editor() {
 
         <section className="card space-y-3">
           <h2 className="font-bold">Demande</h2>
-          <select className="input" disabled={!!t.id} value={t.client_id || ""} onChange={(e) => { const x = clients.find((k) => k.id === e.target.value); set({ client_id: e.target.value, address: t.address || (x ? [x.address, x.zip, x.city].filter(Boolean).join(" ") : "") }); }}>
-            <option value="">— Client —</option>{clients.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-          </select>
+          <ClientPicker clients={clients} disabled={!!t.id} value={t.client_id}
+            onCreated={(x) => setClients((l) => [...l, x].sort((a, b) => a.name.localeCompare(b.name)))}
+            onChange={(x) => set({ client_id: x?.id || null, address: t.address || (x ? [x.address, x.zip, x.city].filter(Boolean).join(" ") : "") } as any)} />
           {(client?.phone || t.client_snapshot?.phone) && <a href={`tel:${client?.phone || t.client_snapshot?.phone}`} className="text-sm text-brand">📞 {client?.phone || t.client_snapshot?.phone}</a>}
           <input className="input" placeholder="Adresse d'intervention" disabled={closed} value={t.address || ""} onChange={(e) => set({ address: e.target.value })} />
           <div className="grid grid-cols-2 gap-2">

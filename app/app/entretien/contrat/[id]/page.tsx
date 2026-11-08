@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import ClientPicker from "@/components/ClientPicker";
 import { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
@@ -138,10 +139,9 @@ function Editor() {
         <section className="card space-y-3">
           <span className="label !mb-0">Client</span>
           {editable ? (
-            <select className="input" value={c.client_id || ""} onChange={(e) => { const x = clients.find((k) => k.id === e.target.value); set({ client_id: e.target.value, site_address: c.site_address || (x ? [x.address, x.zip, x.city].filter(Boolean).join(" ") : "") }); }}>
-              <option value="">— Choisir un client —</option>
-              {clients.map((x) => <option key={x.id} value={x.id}>{x.name}{x.city ? ` (${x.city})` : ""}</option>)}
-            </select>
+            <ClientPicker clients={clients} value={c.client_id} placeholder="— Choisir un client —" showCity
+              onCreated={(x) => setClients((l) => [...l, x].sort((a, b) => a.name.localeCompare(b.name)))}
+              onChange={(x) => set({ client_id: x?.id || null, site_address: c.site_address || (x ? [x.address, x.zip, x.city].filter(Boolean).join(" ") : "") } as any)} />
           ) : <p className="font-semibold">{c.client_snapshot?.name}</p>}
           {(client || c.client_snapshot) && <p className="text-sm text-slate-500">{[client?.phone || c.client_snapshot?.phone, client?.email || c.client_snapshot?.email].filter(Boolean).join(" · ") || "Pas de téléphone ni d'e-mail"}</p>}
           {editable && <Link href="/app/clients" className="text-sm text-brand">＋ Gérer les clients</Link>}

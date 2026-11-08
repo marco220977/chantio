@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import ClientPicker from "@/components/ClientPicker";
 import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { currentUser, sb } from "@/lib/supabase";
@@ -140,10 +141,9 @@ function Visit() {
           {r.contract_id ? <p className="text-xs text-slate-500">Visite rattachée à un contrat d'entretien. <Link className="text-brand" href={`/app/entretien/contrat/${r.contract_id}`}>Voir le contrat</Link></p> : null}
           <span className="label !mb-0">Client</span>
           {editable && !r.contract_id ? (
-            <select className="input" value={r.client_id || ""} onChange={(e) => { const x = clients.find((k) => k.id === e.target.value); set({ client_id: e.target.value, site_address: r.site_address || (x ? [x.address, x.zip, x.city].filter(Boolean).join(" ") : "") }); }}>
-              <option value="">— Choisir un client —</option>
-              {clients.map((x) => <option key={x.id} value={x.id}>{x.name}{x.city ? ` (${x.city})` : ""}</option>)}
-            </select>
+            <ClientPicker clients={clients} value={r.client_id} placeholder="— Choisir un client —" showCity
+              onCreated={(x) => setClients((l) => [...l, x].sort((a, b) => a.name.localeCompare(b.name)))}
+              onChange={(x) => set({ client_id: x?.id || null, site_address: r.site_address || (x ? [x.address, x.zip, x.city].filter(Boolean).join(" ") : "") } as any)} />
           ) : <p className="font-semibold">{r.client_snapshot?.name || client?.name}</p>}
           <div><label className="label">Adresse de l'installation</label><input className="input" disabled={!editable} value={r.site_address || ""} onChange={(e) => set({ site_address: e.target.value })} /></div>
           <div className="grid grid-cols-2 gap-2">
