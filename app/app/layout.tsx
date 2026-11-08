@@ -25,7 +25,7 @@ const SUP_ONLY = ["/app/devis", "/app/factures", "/app/doc", "/app/chiffre-affai
 
 function TrialBanner() {
   const { company, isSup, active } = useCompany();
-  if (!company || company.plan === "pro") return null;
+  if (!company || company.plan === "pro" || company.plan === "free") return null;
   if (!active) return (
     <Link href={isSup ? "/app/abonnement" : "/app"} className="block bg-red-600 px-4 py-2 text-center text-sm font-semibold text-white">
       {isSup ? ((company as any)?.trial_note ? `🔒 ${(company as any).trial_note} →` : "🔒 Essai terminé : consultation seule. Abonnez-vous pour créer et envoyer des documents →") : "🔒 Abonnement de l'entreprise inactif : consultation seule. Prévenez votre responsable."}

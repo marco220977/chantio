@@ -9,10 +9,10 @@ type Co = { id: string; name: string; email?: string; city?: string; plan?: stri
   referred: boolean; referrer?: string | null; members: number; quotes: number; invoices: number; last_seen?: string | null };
 
 const statusOf = (c: Co, now: number) =>
-  c.plan === "pro" ? (c.cancel_at ? "resiliation" : "abonne") : c.plan === "canceled" ? "resilie"
+  c.plan === "free" ? "offert" : c.plan === "pro" ? (c.cancel_at ? "resiliation" : "abonne") : c.plan === "canceled" ? "resilie"
   : new Date(c.trial_ends_at || 0).getTime() > now ? "essai" : "expire";
 const ST: Record<string, [string, string]> = {
-  abonne: ["Abonné", "bg-green-100 text-green-800"], resiliation: ["Résiliation prévue", "bg-amber-100 text-amber-800"],
+  abonne: ["Abonné", "bg-green-100 text-green-800"], offert: ["Accès offert", "bg-purple-100 text-purple-800"], resiliation: ["Résiliation prévue", "bg-amber-100 text-amber-800"],
   essai: ["Essai", "bg-blue-100 text-blue-800"], expire: ["Essai terminé", "bg-slate-200 text-slate-700"], resilie: ["Résilié", "bg-red-100 text-red-700"],
 };
 const d = (s?: string | null) => (s ? new Date(s).toLocaleDateString("fr-FR") : "—");
@@ -38,7 +38,7 @@ export default function Admin() {
     const month = new Date(); month.setDate(1); month.setHours(0, 0, 0, 0);
     const week = now - 7 * 86400000;
     const subs = by("abonne") + by("resiliation");
-    const endedTrials = cs.filter((c) => statusOf(c, now) !== "essai").length;
+    const endedTrials = cs.filter((c) => !["essai", "offert"].includes(statusOf(c, now))).length;
     return {
       total: cs.length, subs, trial: by("essai"), expired: by("expire"), canceled: by("resilie"), leaving: by("resiliation"),
       mrr: subs * PRICE_HT, arr: subs * PRICE_HT * 12,

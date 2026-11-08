@@ -8,7 +8,7 @@ type Ctx = { company: Company | null; me: Member | null; team: Member[]; isSup: 
 const C = createContext<Ctx>({ company: null, me: null, team: [], isSup: false, loaded: false, active: true, reload: async () => {} });
 
 // Essai en cours ou abonnement actif (sinon : consultation seule)
-export const isActive = (c?: Company | null) => !c || c.plan === "pro" || new Date(c.trial_ends_at || 0).getTime() > Date.now();
+export const isActive = (c?: Company | null) => !c || c.plan === "pro" || c.plan === "free" || new Date(c.trial_ends_at || 0).getTime() > Date.now();
 
 export const ROLE_LABEL: Record<string, string> = { owner: "Superviseur (titulaire)", supervisor: "Superviseur", technician: "Technicien" };
 export const memberName = (m?: Member | null) => m?.full_name || m?.email || "—";

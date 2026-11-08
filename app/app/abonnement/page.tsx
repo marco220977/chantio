@@ -35,6 +35,7 @@ export default function Abonnement() {
 
   if (!company) return null;
   const pro = company.plan === "pro";
+  const free = company.plan === "free";
   const trialEnded = new Date(company.trial_ends_at || 0).getTime() < Date.now();
 
   return (
@@ -46,13 +47,15 @@ export default function Abonnement() {
 
         <div className="card text-center">
           <p className="label">Formule actuelle</p>
-          <p className="text-2xl font-extrabold">{pro ? "Pro ⭐" : company.plan === "canceled" ? "Résilié" : trialEnded ? "Essai terminé" : "Essai gratuit"}</p>
-          {!pro && company.plan !== "canceled" && <p className="text-sm text-slate-500">{trialEnded ? "Terminé le" : "Fin de l'essai :"} {dateFr(company.trial_ends_at)}</p>}
+          <p className="text-2xl font-extrabold">{free ? "Accès illimité offert 🎁" : pro ? "Pro ⭐" : company.plan === "canceled" ? "Résilié" : trialEnded ? "Essai terminé" : "Essai gratuit"}</p>
+          {!pro && !free && company.plan !== "canceled" && <p className="text-sm text-slate-500">{trialEnded ? "Terminé le" : "Fin de l'essai :"} {dateFr(company.trial_ends_at)}</p>}
           {!pro && (company as any).trial_note && <p className="mt-1 rounded-lg bg-amber-50 p-2 text-sm text-amber-900">{(company as any).trial_note}</p>}
           {pro && company.cancel_at && <p className="text-sm font-semibold text-amber-700">Résiliation programmée : accès jusqu'au {dateFr(company.cancel_at)}</p>}
         </div>
 
-        {!pro && (
+        {free && <p className="card text-center text-sm text-slate-600">Ce compte bénéficie d'un accès illimité offert : toutes les fonctionnalités sont disponibles, sans abonnement.</p>}
+
+        {!pro && !free && (
           <div className="card space-y-3 text-center">
             <p className="text-4xl font-extrabold">29 €<span className="text-base font-medium text-slate-500"> HT/mois</span></p>
             <ul className="space-y-1 text-left text-sm">
