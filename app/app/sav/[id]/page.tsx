@@ -32,6 +32,8 @@ function Editor() {
   const [t, setT] = useState<Ticket | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [iv, setIv] = useState<{ id: string; starts_at: string; status: string } | null>(null); // RDV au planning
+  const [slots, setSlots] = useState<{ start: string; tech: string; tech_name: string; detour: number; best: boolean }[] | null>(null);
+  const [slotsBusy, setSlotsBusy] = useState(false);
   const [contracts, setContracts] = useState<any[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<null | (() => Promise<any>)>(null);
@@ -128,8 +130,22 @@ function Editor() {
     await save({ photos: t!.photos.filter((x) => x !== p) });
   }
 
+  // Créneaux disponibles (trajets optimisés)
+  async function findSlots() {
+    const address = t!.address || [t!.client_snapshot?.address, t!.client_snapshot?.zip, t!.client_snapshot?.city].filter(Boolean).join(" ");
+    if (!address) return setErr("Indiquez d'abord l'adresse d'intervention.");
+    setSlotsBusy(true); setSlots([]);
+    const { data: { session } } = await sb().auth.getSession();
+    const r = await fetch("/api/rdv/slots", { method: "POST", headers: { "content-type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ address, sav_id: t!.id || null, tech: (t as any).assigned_to || null }) });
+    const j = await r.json().catch(() => ({}));
+    setSlotsBusy(false);
+    if (!r.ok) { setSlots(null); return setErr(j.error || "Recherche impossible"); }
+    setSlots(j.slots || []);
+  }
+
   async function schedule() {
-    if (!t!.scheduled_at) return setErr("Choisissez la date et l'heure du rendez-vous.");
+    if (!t!.scheduled_at) return findSlots();
     const saved = await save(["open", ""].includes(t!.status || "") ? { status: "planned" } : {}); if (!saved) return;
     const tech = { assigned_to: (saved as any).assigned_to || null, technician: saved.technician || null };
     if (iv) {
@@ -216,7 +232,29 @@ function Editor() {
                 {team.map((m) => <option key={m.user_id} value={m.user_id}>{memberName(m)}</option>)}
               </select></div>
             </div>
-            {!["resolved"].includes(t.status) && <button className="btn-brand w-full" disabled={!!busy} onClick={schedule}>{iv ? "🔁 Mettre à jour le rendez-vous" : "🗓 Ajouter au planning"}</button>}
+            <button type="button" className="btn-ghost w-full" disabled={slotsBusy} onClick={findSlots}>{slotsBusy ? "Recherche des créneaux…" : "🔎 Voir les créneaux disponibles"}</button>
+            {slots && !slotsBusy && (
+              <div className="space-y-2 rounded-xl bg-slate-50 p-3">
+                {!slots.length ? <p className="text-sm text-slate-500">Aucun créneau libre sur la période : choisissez une date à la main.</p> : <>
+                  <p className="text-xs text-slate-500">Créneaux libres, classés pour limiter les trajets. ⭐ = un technicien est déjà dans le secteur ce jour-là. Touchez un créneau pour le choisir.</p>
+                  {Object.entries(slots.reduce((g: Record<string, typeof slots>, x) => { const k = new Date(x.start).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }); (g[k] ||= []).push(x); return g; }, {})).map(([day, list]) => (
+                    <div key={day}>
+                      <p className="text-sm font-semibold capitalize">{day}</p>
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        {list.map((x) => {
+                          const on = t.scheduled_at && new Date(t.scheduled_at).getTime() === new Date(x.start).getTime() && (t as any).assigned_to === x.tech;
+                          return <button key={x.start + x.tech} type="button" onClick={() => set({ scheduled_at: x.start, assigned_to: x.tech, technician: x.tech_name } as any)}
+                            className={`rounded-xl border px-3 py-1.5 text-sm ${on ? "border-flame bg-flame text-white" : "border-slate-300 bg-white"}`}>
+                            <b>{new Date(x.start).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</b>{x.best && " ⭐"}{team.length > 1 && <span className="block text-[10px] opacity-80">{x.tech_name}</span>}
+                          </button>;
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </>}
+              </div>
+            )}
+            {!["resolved"].includes(t.status) && <button className="btn-brand w-full" disabled={!!busy || slotsBusy} onClick={schedule}>{iv ? "🔁 Mettre à jour le rendez-vous" : t.scheduled_at ? "🗓 Ajouter au planning" : "🗓 Choisir un créneau"}</button>}
             {t.id && !["resolved"].includes(t.status) && <RdvLink ticket={t} companyName={company?.name || ""} onToken={(tk) => setT({ ...t, booking_token: tk } as any)} />}
           </section>
         )}
