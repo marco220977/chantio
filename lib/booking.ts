@@ -7,7 +7,7 @@ export type Ctx = {
   active: boolean;
   company: { name: string; phone?: string; email?: string; logo_url?: string; address?: string; zip?: string; city?: string; sms_enabled?: boolean; sms_sender?: string;
     duration: number; day_start: string; day_end: string; buffer: number; max_km: number; days_ahead: number; saturday: boolean; auto_confirm: boolean; keep_free: number };
-  ticket: { id: string; number: string; problem?: string; status: string; address: string; client_name?: string; client_email?: string; client_phone?: string };
+  ticket: { id: string; kind?: string; number: string; problem?: string; status: string; address: string; client_name?: string; client_email?: string; client_phone?: string };
   booked: { id: string; starts_at: string; duration_min: number; status: string } | null;
   techs: { id: string; name?: string; role: string }[];
   busy: Busy[];

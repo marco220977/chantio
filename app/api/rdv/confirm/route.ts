@@ -18,7 +18,8 @@ export async function POST(req: Request) {
     .select("id, starts_at, address, company_id, sav_id, clients(name, email, phone)").single();
   if (error || !iv) return NextResponse.json({ error: error?.message || "Rendez-vous introuvable" }, { status: 404 });
   const { data: co } = await s.from("companies").select("name, email, phone, logo_url, sms_enabled, sms_sender").eq("id", iv.company_id).single();
-  const { data: tk } = iv.sav_id ? await s.from("sav_tickets").select("number, booking_token, client_snapshot").eq("id", iv.sav_id).single() : { data: null as any };
+  const { data: tk } = iv.sav_id ? await s.from("sav_tickets").select("number, booking_token, client_snapshot").eq("id", iv.sav_id).single()
+    : await s.from("receptions").select("number, booking_token, client_snapshot").eq("intervention_id", iv.id).maybeSingle();
 
   const cl: any = iv.clients || {};
   const snap: any = tk?.client_snapshot || {};
@@ -36,7 +37,7 @@ export async function POST(req: Request) {
         subject: `Rendez-vous confirmé — ${label}`,
         html: wrapHtml(co || { name: "" }, `<p>Bonjour ${escHtml(name)},</p>
           <p>Votre rendez-vous est <b>confirmé</b> :</p>
-          <p><b>${escHtml(label)}</b>${iv.address ? `<br>${escHtml(iv.address)}` : ""}${tk?.number ? `<br>SAV n° ${escHtml(tk.number)}` : ""}</p>
+          <p><b>${escHtml(label)}</b>${iv.address ? `<br>${escHtml(iv.address)}` : ""}${tk?.number && iv.sav_id ? `<br>SAV n° ${escHtml(tk.number)}` : ""}</p>
           ${link ? `<p>Un empêchement ? Changez de créneau ici : <a href="${link}">${link}</a></p>` : ""}`) });
       out.email = true;
     } catch (e: any) { out.errors.push(`E-mail : ${e.message}`); }

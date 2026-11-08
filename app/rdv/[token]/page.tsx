@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 type Data = {
   error?: string; mode?: string;
   company: { name: string; phone?: string; logo_url?: string; duration: number; auto_confirm: boolean };
-  ticket: { number: string; problem?: string; address: string; client_name?: string };
+  ticket: { kind?: string; number: string; problem?: string; address: string; client_name?: string };
   booked: { starts_at: string; status: string } | null;
   slots: { start: string; tech: string; best?: boolean }[];
 };
@@ -47,7 +47,7 @@ export default function Rdv() {
     <main className="mx-auto max-w-md space-y-4 p-4 pb-16">
       <header className="flex items-center gap-3 pt-2">
         {d.company.logo_url && <img src={d.company.logo_url} alt="" className="h-12 w-12 rounded-xl object-contain" />}
-        <div><p className="text-lg font-bold">{d.company.name}</p><p className="text-sm text-slate-500">Prise de rendez-vous — SAV n° {d.ticket.number}</p></div>
+        <div><p className="text-lg font-bold">{d.company.name}</p><p className="text-sm text-slate-500">Prise de rendez-vous — {d.ticket.kind === "quitus" ? "intervention" : `SAV n° ${d.ticket.number}`}</p></div>
       </header>
 
       <section className="card space-y-1 text-sm">

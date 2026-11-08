@@ -33,7 +33,7 @@ export async function GET(req: Request) {
   if (!l) return NextResponse.json({ error: "Ce lien de rendez-vous n'est plus valide." }, { status: 404 });
   const { ctx, client, depot } = l;
   const base = { company: { name: ctx.company.name, phone: ctx.company.phone, logo_url: ctx.company.logo_url, duration: ctx.company.duration, auto_confirm: ctx.company.auto_confirm },
-    ticket: { number: ctx.ticket.number, problem: ctx.ticket.problem, address: ctx.ticket.address, client_name: ctx.ticket.client_name }, booked: ctx.booked };
+    ticket: { kind: ctx.ticket.kind, number: ctx.ticket.number, problem: ctx.ticket.problem, address: ctx.ticket.address, client_name: ctx.ticket.client_name }, booked: ctx.booked };
   if (!ctx.active) return NextResponse.json({ ...base, slots: [], error: "La prise de rendez-vous en ligne n'est pas disponible : contactez-nous par téléphone." });
   if (["resolved", "closed"].includes(ctx.ticket.status)) return NextResponse.json({ ...base, slots: [], error: "Cette intervention est déjà terminée." });
   if (!client) return NextResponse.json({ ...base, slots: [], error: "Adresse d'intervention introuvable : contactez-nous pour fixer le rendez-vous." });
@@ -60,12 +60,13 @@ export async function POST(req: Request) {
 
   // Notifications (au mieux, sans bloquer la réservation)
   const co = ctx.company; const tk = ctx.ticket; const label = fmtSlot(when);
+  const ref = tk.kind === "quitus" ? `intervention (quitus ${tk.number || ""})` : `SAV ${tk.number}`;
   const confirmed = data?.status === "planned";
   const base = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin;
   const jobs: Promise<unknown>[] = [];
-  if (co.email) jobs.push(sendEmail({ fromName: "Chantio", to: co.email, subject: `📅 RDV ${data?.rescheduled ? "déplacé" : "réservé"} par ${tk.client_name || "un client"} — SAV ${tk.number}`,
-    html: wrapHtml({ name: "Chantio" }, `<p>${escHtml(tk.client_name || "Le client")} a ${data?.rescheduled ? "déplacé" : "réservé"} son rendez-vous SAV en ligne :</p>
-      <p><b>${escHtml(label)}</b><br>${escHtml(tk.address)}<br>SAV n° ${escHtml(tk.number)}${tk.problem ? ` — ${escHtml(tk.problem)}` : ""}</p>
+  if (co.email) jobs.push(sendEmail({ fromName: "Chantio", to: co.email, subject: `📅 RDV ${data?.rescheduled ? "déplacé" : "réservé"} par ${tk.client_name || "un client"} — ${ref}`,
+    html: wrapHtml({ name: "Chantio" }, `<p>${escHtml(tk.client_name || "Le client")} a ${data?.rescheduled ? "déplacé" : "réservé"} son rendez-vous en ligne :</p>
+      <p><b>${escHtml(label)}</b><br>${escHtml(tk.address)}<br>${escHtml(ref)}${tk.problem ? ` — ${escHtml(tk.problem)}` : ""}</p>
       <p>${confirmed ? "Le rendez-vous est confirmé et ajouté au planning." : "Il apparaît dans le planning « à confirmer » : ouvrez-le pour le valider."}</p>
       <p><a href="${base}/app/planning">Ouvrir le planning</a></p>`) }));
   if (tk.client_email) jobs.push(sendEmail({ fromName: co.name, replyTo: co.email, to: tk.client_email, toName: tk.client_name,

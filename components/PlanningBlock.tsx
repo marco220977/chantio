@@ -8,11 +8,12 @@ type Slot = { start: string; tech: string; tech_name: string; detour: number; be
 const localInput = (iso?: string | null) => { if (!iso) return ""; const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
 
 // Bloc « Rendez-vous et planning » : créneaux disponibles (trajets optimisés) + ajout / mise à jour au planning
-export default function PlanningBlock({ address, interventionId, onSchedule }: {
+export default function PlanningBlock({ address, interventionId, onSchedule, children }: {
   address: string;
   interventionId?: string | null;
   // Crée l'intervention liée (après enregistrement du document) et renvoie son id
   onSchedule: (when: string, tech: { assigned_to: string | null; technician: string | null }, duration: number) => Promise<string | null>;
+  children?: React.ReactNode;
 }) {
   const { team, company } = useCompany();
   const [iv, setIv] = useState<{ id: string; starts_at: string; status: string; assigned_to?: string | null } | null>(null);
@@ -98,6 +99,7 @@ export default function PlanningBlock({ address, interventionId, onSchedule }: {
       {err && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{err}</p>}
       {msg && <p className="rounded-lg bg-green-50 p-2 text-sm text-green-800">{msg}</p>}
       <button className="btn-brand w-full" disabled={busy} onClick={plan}>{iv ? "🔁 Mettre à jour le rendez-vous" : when ? "🗓 Ajouter au planning" : "🗓 Choisir un créneau"}</button>
+      {children}
     </section>
   );
 }

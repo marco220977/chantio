@@ -2,6 +2,7 @@
 import Link from "next/link";
 import ClientPicker from "@/components/ClientPicker";
 import PlanningBlock from "@/components/PlanningBlock";
+import RdvLink from "@/components/RdvLink";
 import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { currentUser, sb } from "@/lib/supabase";
@@ -238,7 +239,10 @@ function Editor() {
               const saved = await save({ intervention_id: data.id, address: addr || r.address } as any);
               if (!saved) { await sb().from("interventions").delete().eq("id", data.id); return null; }
               return data.id;
-            }} />
+            }}>
+            {r.id ? <RdvLink ticket={r} table="receptions" companyName={company?.name || ""} onToken={(tk) => setR({ ...r, booking_token: tk } as any)} />
+              : <button type="button" className="btn-ghost w-full" onClick={async () => { if (!r.client_id && !r.client_snapshot) return setErr("Choisissez d'abord le client."); const sv = await save(); if (sv) flash("Quitus enregistré : appuyez à nouveau pour créer le lien client."); }}>📲 Laisser le client choisir son RDV en ligne</button>}
+          </PlanningBlock>
         )}
 
         <section className="card space-y-3">
