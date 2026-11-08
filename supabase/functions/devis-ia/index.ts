@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
   if (!(await subscriptionOk(req))) return json({ error: SUB_MSG }, 402);
   const key = Deno.env.get("ANTHROPIC_API_KEY");
   if (!key) return json({ error: "Clé ANTHROPIC_API_KEY manquante" }, 500);
-  const { description, image, catalog, vat } = await req.json().catch(() => ({}));
+  const { description, image, catalog, vat, current, instruction } = await req.json().catch(() => ({}));
   if (!description || String(description).trim().length < 5) return json({ error: "Décrivez le chantier en quelques mots." }, 400);
   const cat = (Array.isArray(catalog) ? catalog : []).slice(0, 400)
     .map((c: any) => `${c.id} | ${String(c.label).slice(0, 120)} | ${c.unit} | ${c.unit_price} | ${c.vat_rate}`).join("\n");
@@ -87,6 +87,10 @@ Deno.serve(async (req) => {
   const m = /^data:(image\/\w+);base64,(.+)$/.exec(image || "");
   if (m) content.push({ type: "image", source: { type: "base64", media_type: m[1], data: m[2] } });
   content.push({ type: "text", text: PROMPT(String(description).slice(0, 4000), cat, Number(vat) || 10) + (m ? "\nUne photo du chantier est jointe : sers-t'en pour préciser le matériel existant." : "") });
+  if (current && String(instruction || "").trim()) {
+    // Modification d'un devis déjà proposé
+    content.push({ type: "text", text: `\n\nVOICI LE DEVIS ACTUEL (JSON) :\n${JSON.stringify(current).slice(0, 30000)}\n\nMODIFICATION DEMANDÉE PAR L'ARTISAN :\n"""${String(instruction).slice(0, 2000)}"""\n\nApplique cette modification au devis actuel : garde toutes les autres lignes telles quelles (mêmes id, quantités et prix), sauf si la demande les concerne. Renvoie le devis COMPLET mis à jour, au même format JSON.` });
+  }
   const model = Deno.env.get("ANTHROPIC_MODEL") || "claude-sonnet-5-5";
   const { r, j } = await callClaude(key, { model, max_tokens: 12000, messages: [{ role: "user", content }] });
   if (!r.ok) { console.error("Anthropic error", r.status, j?.error?.message); return json({ error: frError(j?.error?.message || "", r.status) }, 502); }
