@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import ClientPicker from "@/components/ClientPicker";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import jsPDF from "jspdf";
@@ -65,9 +66,9 @@ function NewChantier() {
         {err && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
         <div><label className="label">Nom du chantier</label><input className="input" placeholder="Ex : Remplacement chaudière Mme Fontaine" value={c.title || ""} onChange={(e) => setC({ ...c, title: e.target.value })} /></div>
         <div><label className="label">Client</label>
-          <select className="input" value={c.client_id || ""} onChange={(e) => { const x = clients.find((k) => k.id === e.target.value); setC({ ...c, client_id: e.target.value, address: c.address || (x ? [x.address, x.zip, x.city].filter(Boolean).join(" ") : "") }); }}>
-            <option value="">— Choisir —</option>{clients.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-          </select></div>
+          <ClientPicker clients={clients} value={c.client_id} placeholder="— Choisir —"
+            onCreated={(x) => setClients((l) => [...l, x].sort((a, b) => a.name.localeCompare(b.name)))}
+            onChange={(x) => setC({ ...c, client_id: x?.id || null, address: c.address || (x ? [x.address, x.zip, x.city].filter(Boolean).join(" ") : "") } as any)} /></div>
         <div><label className="label">Adresse du chantier</label><input className="input" value={c.address || ""} onChange={(e) => setC({ ...c, address: e.target.value })} /></div>
         <div className="grid grid-cols-2 gap-2">
           <div><label className="label">Début</label><input type="date" className="input" value={c.start_date || ""} onChange={(e) => setC({ ...c, start_date: e.target.value })} /></div>

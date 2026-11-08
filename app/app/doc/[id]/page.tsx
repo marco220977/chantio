@@ -369,10 +369,12 @@ function Editor() {
           </div>
           {editable ? (
             <select className="input" value={doc.client_id || ""} onChange={(e) => {
+              if (e.target.value === "__new") { setModal("client"); return; }
               const c = clients.find((x) => x.id === e.target.value);
               set({ client_id: e.target.value, site_address: doc.site_address || (c ? [c.address, c.zip, c.city].filter(Boolean).join(" ") : "") });
             }}>
               <option value="">— Choisir un client —</option>
+              <option value="__new">＋ Nouveau client…</option>
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}{c.city ? ` (${c.city})` : ""}</option>)}
             </select>
           ) : (
