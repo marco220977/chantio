@@ -37,6 +37,7 @@ export default function Page() {
         <li>Compte : pendant l'abonnement, puis 30 jours après sa fin (export possible), puis suppression.</li>
         <li>Pièces comptables liées à l'abonnement : 10 ans.</li>
         <li>Journaux techniques : 12 mois maximum.</li>
+        <li>Prévention des essais gratuits multiples : une empreinte chiffrée et irréversible (hachage) du numéro SIREN et de l'adresse e-mail est conservée 3 ans à compter de l'inscription, y compris après la suppression du compte, sans aucune autre donnée, afin de n'accorder qu'un seul essai gratuit par entreprise — intérêt légitime (prévention de la fraude).</li>
       </ul>
 
       <h2>5. Destinataires et sous-traitants</h2>

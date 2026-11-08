@@ -14,5 +14,5 @@ export const LEGAL = {
   director: "Marco [NOM]",
   city: "[Ville du siège]",
   price: "29 € HT par mois",
-  updated: "7 novembre 2026",
+  updated: "8 novembre 2026",
 };

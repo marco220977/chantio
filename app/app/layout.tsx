@@ -28,7 +28,7 @@ function TrialBanner() {
   if (!company || company.plan === "pro") return null;
   if (!active) return (
     <Link href={isSup ? "/app/abonnement" : "/app"} className="block bg-red-600 px-4 py-2 text-center text-sm font-semibold text-white">
-      {isSup ? "🔒 Essai terminé : consultation seule. Abonnez-vous pour créer et envoyer des documents →" : "🔒 Abonnement de l'entreprise inactif : consultation seule. Prévenez votre responsable."}
+      {isSup ? ((company as any)?.trial_note ? `🔒 ${(company as any).trial_note} →` : "🔒 Essai terminé : consultation seule. Abonnez-vous pour créer et envoyer des documents →") : "🔒 Abonnement de l'entreprise inactif : consultation seule. Prévenez votre responsable."}
     </Link>
   );
   if (!isSup) return null;

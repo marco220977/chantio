@@ -48,6 +48,7 @@ export default function Abonnement() {
           <p className="label">Formule actuelle</p>
           <p className="text-2xl font-extrabold">{pro ? "Pro ⭐" : company.plan === "canceled" ? "Résilié" : trialEnded ? "Essai terminé" : "Essai gratuit"}</p>
           {!pro && company.plan !== "canceled" && <p className="text-sm text-slate-500">{trialEnded ? "Terminé le" : "Fin de l'essai :"} {dateFr(company.trial_ends_at)}</p>}
+          {!pro && (company as any).trial_note && <p className="mt-1 rounded-lg bg-amber-50 p-2 text-sm text-amber-900">{(company as any).trial_note}</p>}
           {pro && company.cancel_at && <p className="text-sm font-semibold text-amber-700">Résiliation programmée : accès jusqu'au {dateFr(company.cancel_at)}</p>}
         </div>
 
