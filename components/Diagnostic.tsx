@@ -19,6 +19,8 @@ const BRANDS: [string, RegExp][] = [
 ];
 const brandOf = (eq: string) => BRANDS.find(([, r]) => r.test(eq))?.[0] || "";
 const searchUrl = (n: Notice) => "https://www.google.com/search?q=" + encodeURIComponent(`notice ${n.brand} ${(n.range_label || "").split(/[(,—]/)[0].trim()} code erreur ${n.code} filetype:pdf`);
+// Phrase tapée dans le champ code (ex : "le moteur affiche 100 % mais ne tourne pas")
+const isSentence = (c: string) => c.trim().split(/\s+/).length >= 3 && c.trim().length > 12;
 const isUrl = (s?: string | null) => !!s && /^https?:\/\//.test(s);
 
 export function noticeText(n: Notice) {
@@ -47,7 +49,7 @@ export default function Diagnostic({ equipment = "", onUse }: { equipment?: stri
 
   // Recherche instantanée dans la base des notices constructeurs
   useEffect(() => {
-    const n = normCode(code);
+    const n = isSentence(code) ? "" : normCode(code);
     if (n.length < 1) { setNotices(null); return; }
     let stop = false;
     const t = setTimeout(async () => {
@@ -74,7 +76,7 @@ export default function Diagnostic({ equipment = "", onUse }: { equipment?: stri
 
   async function run() {
     setBusy(true); setErr("");
-    const { data, error } = await sb().functions.invoke("diagnostic", { body: { equipment: eq, code, symptoms, done } });
+    const { data, error } = await sb().functions.invoke("diagnostic", { body: isSentence(code) ? { equipment: eq, code: "", symptoms: [code.toLowerCase(), symptoms].filter(Boolean).join(". "), done } : { equipment: eq, code, symptoms, done } });
     setBusy(false);
     if (error) { let m = error.message; try { const j = await (error as any).context?.json?.(); if (j?.error) m = j.error; } catch {} return setErr(m); }
     if (data?.error) return setErr(data.error);
@@ -94,7 +96,7 @@ export default function Diagnostic({ equipment = "", onUse }: { equipment?: stri
       </div>
       {err && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
 
-      {notices && normCode(code) && (
+      {notices && !isSentence(code) && normCode(code) && (
         <div className="space-y-2">
           {!notices.length && <p className="rounded-xl bg-slate-50 p-3 text-xs text-slate-500">📘 Code {code} absent de la base des notices ({brand || "toutes marques"}). Utilisez « Trouver la panne » pour une recherche IA.</p>}
           {brand && !mine.length && !!rest.length && <p className="text-xs text-amber-700">Aucune notice {brand} pour ce code. Résultats d&apos;autres marques :</p>}
