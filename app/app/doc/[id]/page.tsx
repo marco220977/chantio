@@ -30,7 +30,7 @@ function Editor() {
   const { id } = useParams<{ id: string }>();
   const params = useSearchParams();
   const router = useRouter();
-  const { company } = useCompany();
+  const { company, has } = useCompany();
   const isNew = id === "nouveau";
 
   const [doc, setDoc] = useState<Doc | null>(null);
@@ -448,7 +448,8 @@ function Editor() {
             <div className="grid grid-cols-2 gap-2">
               <button className="btn-ghost" onClick={() => setModal("catalog")}>📚 Catalogue</button>
               <button className="btn-ghost" onClick={() => set({ lines: [...doc.lines, emptyLine()] })}>＋ Ligne libre</button>
-              {isQuote && <button className="btn-brand col-span-2" onClick={() => setAi(true)}>✨ Devis par IA (dictée ou texte)</button>}
+              {isQuote && (has("ia") ? <button className="btn-brand col-span-2" onClick={() => setAi(true)}>✨ Devis par IA (dictée ou texte)</button>
+                : <button className="btn-ghost col-span-2" onClick={() => { if (confirm("Le devis par IA est inclus dans les formules Pro et Équipe. Voir les formules ?")) router.push("/app/abonnement"); }}>🔒 Devis par IA — formule Pro</button>)}
             </div>
           )}
         </section>

@@ -3,7 +3,14 @@ import { NextResponse } from "next/server";
 import { sbServer, sbAdmin } from "@/lib/supabase-server";
 import { stripe } from "@/lib/stripe";
 
-export async function POST() {
+const PRICE: Record<string, string | undefined> = {
+  solo: process.env.STRIPE_PRICE_SOLO || process.env.STRIPE_PRICE_ID, pro: process.env.STRIPE_PRICE_PRO, equipe: process.env.STRIPE_PRICE_EQUIPE,
+};
+
+export async function POST(req: Request) {
+  const { tier = "solo" } = await req.json().catch(() => ({}));
+  const price = PRICE[tier];
+  if (!price) return NextResponse.json({ error: "Cette formule n'est pas encore disponible au paiement (prix Stripe à configurer)." }, { status: 503 });
   if (!process.env.STRIPE_SECRET_KEY || !process.env.SUPABASE_SERVICE_ROLE_KEY)
     return NextResponse.json({ error: "Le paiement en ligne n'est pas encore activé sur cette plateforme." }, { status: 503 });
   try {
@@ -25,9 +32,9 @@ export async function POST() {
   const session = await st.checkout.sessions.create({
     mode: "subscription",
     customer,
-    line_items: [{ price: process.env.STRIPE_PRICE_ID!, quantity: 1 }],
+    line_items: [{ price, quantity: 1 }],
     client_reference_id: company.id,
-    subscription_data: { metadata: { company_id: company.id } },
+    subscription_data: { metadata: { company_id: company.id, tier } },
     allow_promotion_codes: true,
     tax_id_collection: { enabled: true },
     customer_update: { name: "auto", address: "auto" },

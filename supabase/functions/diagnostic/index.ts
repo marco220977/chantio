@@ -16,8 +16,8 @@ function frError(msg: string, status: number): string {
 
 async function subscriptionOk(req: Request): Promise<boolean> {
   try {
-    const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/rest/v1/rpc/my_company_active`, {
-      method: "POST", body: "{}",
+    const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/rest/v1/rpc/my_company_has`, {
+      method: "POST", body: JSON.stringify({ p_feature: "ia" }),
       headers: { Authorization: req.headers.get("Authorization") || "", apikey: Deno.env.get("SUPABASE_ANON_KEY") || "", "content-type": "application/json" },
     });
     return (await r.json()) !== false;
@@ -72,7 +72,7 @@ async function callClaude(key: string, body: unknown) {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
-  if (!(await subscriptionOk(req))) return json({ error: "Essai gratuit terminé : abonnez-vous (Menu → Abonnement) pour utiliser l'assistant de diagnostic." }, 402);
+  if (!(await subscriptionOk(req))) return json({ error: "L'intelligence artificielle (devis IA, scan de plaque, diagnostic) est incluse dans les formules Pro et Équipe : Menu → Abonnement." }, 402);
   const key = Deno.env.get("ANTHROPIC_API_KEY");
   if (!key) return json({ error: "Clé ANTHROPIC_API_KEY manquante" }, 500);
   const { equipment, code, symptoms, done } = await req.json().catch(() => ({}));

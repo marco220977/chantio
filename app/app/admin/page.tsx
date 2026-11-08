@@ -5,8 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import { sb } from "@/lib/supabase";
 import Header from "@/components/Header";
 
-const PRICE_HT = 29; // € HT / mois
-type Co = { id: string; name: string; email?: string; city?: string; plan?: string; free_until?: string | null; siren_changed_at?: string | null; trial_ends_at?: string; cancel_at?: string | null; created_at: string;
+const PRICE_HT: Record<string, number> = { solo: 29, pro: 49, equipe: 79 }; // € HT / mois
+type Co = { id: string; name: string; email?: string; city?: string; plan?: string; tier?: string; free_until?: string | null; siren_changed_at?: string | null; trial_ends_at?: string; cancel_at?: string | null; created_at: string;
   referred: boolean; referrer?: string | null; members: number; quotes: number; invoices: number; last_seen?: string | null };
 
 const statusOf = (c: Co, now: number) =>
@@ -42,7 +42,7 @@ export default function Admin() {
     const endedTrials = cs.filter((c) => !["essai", "offert"].includes(statusOf(c, now))).length;
     return {
       total: cs.length, subs, trial: by("essai"), expired: by("expire"), canceled: by("resilie"), leaving: by("resiliation"),
-      mrr: subs * PRICE_HT, arr: subs * PRICE_HT * 12,
+      mrr: cs.filter((c) => ["abonne", "resiliation"].includes(statusOf(c, now))).reduce((t, c) => t + (PRICE_HT[c.tier || "solo"] || 29), 0), arr: cs.filter((c) => ["abonne", "resiliation"].includes(statusOf(c, now))).reduce((t, c) => t + (PRICE_HT[c.tier || "solo"] || 29), 0) * 12,
       newMonth: cs.filter((c) => new Date(c.created_at) >= month).length,
       newWeek: cs.filter((c) => new Date(c.created_at).getTime() >= week).length,
       conv: endedTrials ? Math.round((subs + by("resilie")) / endedTrials * 100) : 0,
@@ -97,7 +97,7 @@ export default function Admin() {
             <div key={c.id} className="card space-y-1 !py-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0"><p className="truncate font-semibold">{c.name}</p><p className="truncate text-xs text-slate-500">{[c.city, c.email].filter(Boolean).join(" · ")}</p></div>
-                <span className={`chip shrink-0 ${st[1]}`}>{st[0]}</span>
+                <span className={`chip shrink-0 ${st[1]}`}>{st[0]}{c.plan === "pro" ? ` · ${({ solo: "Solo", pro: "Pro", equipe: "Équipe" } as Record<string, string>)[c.tier || "solo"]}` : ""}</span>
               </div>
               <p className="text-xs text-slate-500">
                 Inscrit le {d(c.created_at)}{statusOf(c, now) === "essai" || statusOf(c, now) === "expire" ? ` · fin d'essai ${d(c.trial_ends_at)}` : ""}{c.cancel_at ? ` · fin le ${d(c.cancel_at)}` : ""}{c.siren_changed_at ? ` · 🔁 entreprise (SIREN) changée le ${d(c.siren_changed_at)}` : ""}
@@ -108,7 +108,7 @@ export default function Admin() {
           );
         })}
         {list.length === 0 && <p className="py-6 text-center text-sm text-slate-500">Aucune entreprise.</p>}
-        <p className="text-center text-[11px] text-slate-400">Revenu calculé à {PRICE_HT} € HT / mois par abonné.</p>
+        <p className="text-center text-[11px] text-slate-400">Revenu calculé selon la formule de chaque abonné : Solo 29 €, Pro 49 €, Équipe 79 € HT / mois.</p>
       </div>
     </>
   );

@@ -23,7 +23,7 @@ function Planning() {
   const [list, setList] = useState<Iv[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [edit, setEdit] = useState<Iv | null>(null);
-  const { team, me, isSup, company } = useCompany();
+  const { team, me, isSup, company, has } = useCompany();
   const [who, setWho] = useState<string>("all");
   useEffect(() => { if (me && !isSup) setWho(me.user_id); }, [me, isSup]);
 
@@ -194,7 +194,7 @@ function Planning() {
       {edit && (
         <Modal title={edit.id ? "Intervention" : edit._kind === "sav" ? "Nouveau SAV" : "Nouvelle intervention"} onClose={() => setEdit(null)}>
           <div className="space-y-3">
-            {!edit.id && (
+            {!edit.id && has("entretien") && (
               <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-200 p-1">
                 {([["intervention", "🔧 Intervention"], ["sav", "🛠 SAV"]] as const).map(([k, l]) => (
                   <button key={k} onClick={() => setEdit({ ...edit, _kind: k })} className={`rounded-lg py-2 text-sm font-semibold ${(edit._kind || "intervention") === k ? "bg-white shadow" : "text-slate-600"}`}>{l}</button>

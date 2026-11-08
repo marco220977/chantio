@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TIERS, type Tier } from "@/lib/plans";
 
 const APP = process.env.NEXT_PUBLIC_APP_NAME || "Chantio";
 
@@ -53,11 +54,17 @@ export default function Home({ searchParams }: { searchParams: { compte?: string
           ))}
         </section>
 
-        <section className="mt-16 card text-center">
-          <h2 className="text-2xl font-extrabold">Un seul tarif, tout compris</h2>
-          <p className="mt-3 text-4xl font-extrabold">29 €<span className="text-base font-medium text-slate-500"> HT / mois</span></p>
-          <p className="mt-2 text-slate-600">Devis et factures illimités, signature, planning, scan de plaque.</p>
-          <Link href={signup} className="btn-brand mt-6 w-full py-3.5">Commencer gratuitement</Link>
+        <section className="mt-16 space-y-3">
+          <h2 className="text-center text-2xl font-extrabold">3 formules, sans engagement</h2>
+          <p className="text-center text-sm text-slate-600">Essai gratuit de 14 jours avec toutes les fonctions, sans carte bancaire.</p>
+          {(Object.keys(TIERS) as Tier[]).map((k) => (
+            <div key={k} className={`card ${k === "pro" ? "border-2 border-flame" : ""}`}>
+              <div className="flex items-baseline justify-between"><h3 className="text-xl font-extrabold">{TIERS[k].name}</h3><p className="text-2xl font-extrabold">{TIERS[k].price} €<span className="text-sm font-medium text-slate-500"> HT/mois</span></p></div>
+              <p className="text-sm text-slate-500">{TIERS[k].tagline}</p>
+              <ul className="mt-2 space-y-0.5 text-sm">{TIERS[k].includes.map((x) => <li key={x}>✅ {x}</li>)}</ul>
+            </div>
+          ))}
+          <Link href={signup} className="btn-brand w-full py-3.5">Commencer gratuitement</Link>
         </section>
 
         <footer className="mt-16 space-y-2 text-center text-xs text-slate-400">

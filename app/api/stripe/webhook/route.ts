@@ -15,8 +15,10 @@ export async function POST(req: Request) {
   if (event.type.startsWith("customer.subscription.")) {
     const sub = event.data.object as Stripe.Subscription;
     const active = ["active", "trialing", "past_due"].includes(sub.status) && event.type !== "customer.subscription.deleted";
+    const priceId = sub.items?.data?.[0]?.price?.id;
+    const tier = priceId === process.env.STRIPE_PRICE_EQUIPE ? "equipe" : priceId === process.env.STRIPE_PRICE_PRO ? "pro" : "solo";
     await admin.from("companies").update({
-      plan: active ? "pro" : "canceled", stripe_subscription_id: sub.id,
+      plan: active ? "pro" : "canceled", tier, stripe_subscription_id: sub.id,
       cancel_at: sub.cancel_at && active ? new Date(sub.cancel_at * 1000).toISOString() : null,
     }).eq("stripe_customer_id", sub.customer as string);
   }
@@ -32,7 +34,7 @@ export async function POST(req: Request) {
           const yearCount = await admin.from("referrals").select("id", { count: "exact", head: true }).eq("referrer_id", parrain.id).eq("status", "recompense").gte("rewarded_at", new Date(Date.now() - 365 * 86400000).toISOString());
           if ((yearCount.count || 0) < 12) {
             if (parrain.plan === "pro" && parrain.stripe_customer_id) {
-              const price = await stripe().prices.retrieve(process.env.STRIPE_PRICE_ID!);
+              const price = await stripe().prices.retrieve(process.env.STRIPE_PRICE_SOLO || process.env.STRIPE_PRICE_ID!);
               const amount = Math.round((price.unit_amount || 2900) * 1.2); // un mois TTC
               await stripe().customers.createBalanceTransaction(parrain.stripe_customer_id, { amount: -amount, currency: "eur", description: "Parrainage : 1 mois offert" });
             } else {

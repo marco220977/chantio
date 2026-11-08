@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { sb } from "@/lib/supabase";
+import { effectiveTier, TIERS } from "@/lib/plans";
 import { sendMail } from "@/lib/send";
 import Header from "@/components/Header";
 import Modal from "@/components/Modal";
@@ -9,7 +10,8 @@ import { memberName, ROLE_LABEL, useCompany } from "@/components/CompanyContext"
 type Inv = { id: string; email: string; full_name?: string; role: string; token: string; accepted_at?: string; sent_at?: string; created_at: string };
 
 export default function Equipe() {
-  const { team, me, reload } = useCompany();
+  const { team, me, reload, company } = useCompany();
+  const maxUsers = TIERS[effectiveTier(company)].users;
   const [invs, setInvs] = useState<Inv[]>([]);
   const [form, setForm] = useState<{ email: string; full_name: string; role: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -55,6 +57,7 @@ export default function Equipe() {
       <div className="space-y-4 p-4">
         {err && <p onClick={() => setErr("")} className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
         {msg && <p className="rounded-xl bg-green-50 p-3 text-sm text-green-800">{msg}</p>}
+        <p className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600">Formule {TIERS[effectiveTier(company)].name} : jusqu'à {maxUsers} utilisateur{maxUsers > 1 ? "s" : ""}.{effectiveTier(company) !== "equipe" && <> Pour ajouter des techniciens : <a href="/app/abonnement" className="text-brand underline">formule supérieure</a>.</>}</p>
 
         <section className="space-y-2">
           <h2 className="font-bold">Membres ({team.length})</h2>

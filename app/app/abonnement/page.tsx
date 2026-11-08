@@ -5,6 +5,7 @@ import { useCompany } from "@/components/CompanyContext";
 import Header from "@/components/Header";
 import ReferralCard from "@/components/ReferralCard";
 import { dateFr } from "@/lib/calc";
+import { TIERS, type Tier } from "@/lib/plans";
 
 export default function Abonnement() {
   const { company, reload } = useCompany();
@@ -35,6 +36,7 @@ export default function Abonnement() {
 
   if (!company) return null;
   const pro = company.plan === "pro";
+  const tier = ((company as any).tier || "solo") as Tier;
   const free = company.plan === "free" && (!company.free_until || new Date(company.free_until).getTime() > Date.now());
   const trialEnded = new Date(company.trial_ends_at || 0).getTime() < Date.now();
 
@@ -47,7 +49,7 @@ export default function Abonnement() {
 
         <div className="card text-center">
           <p className="label">Formule actuelle</p>
-          <p className="text-2xl font-extrabold">{free ? (company.free_until ? "Accès offert 🎁" : "Accès illimité offert 🎁") : pro ? "Pro ⭐" : company.plan === "canceled" ? "Résilié" : trialEnded ? "Essai terminé" : "Essai gratuit"}</p>
+          <p className="text-2xl font-extrabold">{free ? (company.free_until ? "Accès offert 🎁" : "Accès illimité offert 🎁") : pro ? `Formule ${TIERS[tier].name} ⭐` : company.plan === "canceled" ? "Résilié" : trialEnded ? "Essai terminé" : "Essai gratuit"}</p>
           {!pro && !free && company.plan !== "canceled" && <p className="text-sm text-slate-500">{trialEnded ? "Terminé le" : "Fin de l'essai :"} {dateFr(company.trial_ends_at)}</p>}
           {!pro && (company as any).trial_note && <p className="mt-1 rounded-lg bg-amber-50 p-2 text-sm text-amber-900">{(company as any).trial_note}</p>}
           {pro && company.cancel_at && <p className="text-sm font-semibold text-amber-700">Résiliation programmée : accès jusqu'au {dateFr(company.cancel_at)}</p>}
@@ -55,15 +57,29 @@ export default function Abonnement() {
 
         {free && <p className="card text-center text-sm text-slate-600">Ce compte bénéficie d'un accès offert{company.free_until ? ` jusqu'au ${dateFr(company.free_until)}` : " sans limite de durée"} : toutes les fonctionnalités sont disponibles, sans abonnement.{company.free_until ? " Vous pourrez ensuite vous abonner ici." : ""}</p>}
 
-        {!pro && !free && (
-          <div className="card space-y-3 text-center">
-            <p className="text-4xl font-extrabold">29 €<span className="text-base font-medium text-slate-500"> HT/mois</span></p>
-            <ul className="space-y-1 text-left text-sm">
-              {["Devis et factures illimités, aperçu PDF avant envoi", "Envoi par e-mail et suivi d'ouverture par le client", "Signature électronique sur place et à distance, avec photo", "Avenants, factures de situation et retenue de garantie", "Aides MaPrimeRénov' / CEE, mentions RGE, autoliquidation", "Facture électronique 2026 (Factur-X, transmission à la plateforme agréée)", "Paiement en ligne des factures et acomptes", "Relances automatiques, rappels de RDV par SMS ou e-mail", "Demandes d'avis Google automatiques", "Devis par IA (dictée vocale ou photo)", "Ouvrages composés et bons de commande fournisseurs", "Import des tarifs fournisseurs", "Planning d'équipe : superviseurs et techniciens", "Planning des SAV et des interventions facturables", "Quitus d'intervention déclenché depuis le planning", "Facture créée automatiquement à la signature du quitus", "Fiche client avec tous ses documents", "Vérification des entreprises clientes (infos Kbis, procédures collectives)", "Contrats et attestations d'entretien", "Suivi de chantier, quitus et SAV avec photos", "Photos horodatées et géolocalisées", "Scan de plaque chaudière", "Codes erreur des notices constructeurs (Saunier Duval, Chaffoteaux, De Dietrich, Atlantic, ELM Leblanc) et aide au diagnostic par IA", "Vidéos sur chantiers, SAV et quitus", "Chiffre d'affaires et TVA par taux", "Export comptable", "Suggestions et signalement de problèmes"].map((x) => <li key={x}>✅ {x}</li>)}
-            </ul>
-            <p className="text-xs text-slate-500">Sans engagement, résiliable à tout moment. <a href="/legal/cgv" className="text-brand underline">Conditions générales</a></p>
-            <button className="btn-brand w-full py-3.5" disabled={busy} onClick={() => call("/api/stripe/checkout")}>{busy ? "…" : "S'abonner"}</button>
-            {company.plan !== "canceled" && <p className="text-xs text-slate-500">Pendant l'essai, aucun moyen de paiement n'est enregistré : il n'y a rien à résilier. Sans abonnement, l'essai s'arrête simplement à sa date de fin.</p>}
+        {!free && (
+          <div className="space-y-3">
+            <p className="font-bold">{pro ? "Changer de formule" : "Choisissez votre formule"}</p>
+            {!pro && company.plan !== "canceled" && !trialEnded && <p className="text-xs text-slate-500">Pendant l'essai, toutes les fonctions (formule Équipe) sont incluses. Aucun moyen de paiement n'est enregistré : sans abonnement, l'essai s'arrête simplement à sa date de fin.</p>}
+            {(Object.keys(TIERS) as Tier[]).map((k) => {
+              const t = TIERS[k]; const current = pro && tier === k;
+              return (
+                <div key={k} className={`card space-y-2 ${current ? "border-2 border-flame" : k === "pro" ? "border-2 border-slate-300" : ""}`}>
+                  <div className="flex items-baseline justify-between">
+                    <p className="text-xl font-extrabold">{t.name}{k === "pro" && !pro && <span className="chip ml-2 bg-orange-100 align-middle text-xs text-orange-800">Le plus choisi</span>}</p>
+                    <p className="text-2xl font-extrabold">{t.price} €<span className="text-sm font-medium text-slate-500"> HT/mois</span></p>
+                  </div>
+                  <p className="text-sm text-slate-500">{t.tagline}</p>
+                  <ul className="space-y-0.5 text-sm">{t.includes.map((x) => <li key={x}>✅ {x}</li>)}</ul>
+                  {current ? <p className="text-center text-sm font-semibold text-flame">Votre formule actuelle</p>
+                    : pro ? <button className="btn-ghost w-full" disabled={busy || !!company.cancel_at} onClick={async () => {
+                        if (!confirm(`Passer à la formule ${t.name} (${t.price} € HT/mois) ? La différence est calculée au prorata sur votre prochaine facture.`)) return;
+                        const j = await call("/api/stripe/change", { tier: k }); if (j) { setMsg(`✅ Formule ${t.name} activée.`); reload(); } }}>Passer à {t.name}</button>
+                    : <button className={`${k === "pro" ? "btn-brand" : "btn-ghost"} w-full py-3`} disabled={busy} onClick={() => call("/api/stripe/checkout", { tier: k })}>{busy ? "…" : `S'abonner à ${t.name}`}</button>}
+                </div>
+              );
+            })}
+            <p className="text-center text-xs text-slate-500">Sans engagement, résiliable à tout moment. <a href="/legal/cgv" className="text-brand underline">Conditions générales</a></p>
           </div>
         )}
 

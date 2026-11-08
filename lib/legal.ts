@@ -13,6 +13,6 @@ export const LEGAL = {
   email: "[adresse e-mail de contact]",
   director: "Marco [NOM]",
   city: "[Ville du siège]",
-  price: "29 € HT par mois",
+  price: "29 € HT (formule Solo), 49 € HT (formule Pro) ou 79 € HT (formule Équipe) par mois, selon la formule choisie",
   updated: "8 novembre 2026",
 };

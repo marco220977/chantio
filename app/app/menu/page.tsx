@@ -22,7 +22,8 @@ const TECH = [
 
 export default function Menu() {
   const router = useRouter();
-  const { me, isSup, company } = useCompany();
+  const { me, isSup, company, has } = useCompany();
+  const lockOf = (h: string) => (h === "/app/entretien" || h === "/app/sav" ? !has("entretien") : h === "/app/scan" ? !has("ia") : false);
   const [admin, setAdmin] = useState(false);
   useEffect(() => { sb().rpc("is_platform_admin").then(({ data }) => setAdmin(!!data)); }, []);
   return (
@@ -32,7 +33,7 @@ export default function Menu() {
         {me && <div className="card bg-slate-50 text-sm"><p className="font-semibold">{memberName(me)}</p><p className="text-slate-500">{ROLE_LABEL[me.role]} · {company?.name}</p></div>}
         {admin && <Link href="/app/admin" className="card flex items-center gap-3 border-2 border-flame"><span className="text-xl">📊</span><span className="font-semibold">Tableau de bord des abonnés</span><span className="ml-auto text-slate-300">›</span></Link>}
         {(isSup ? SUP : TECH).map(([h, i, l]) => (
-          <Link key={h} href={h} className="card flex items-center gap-3"><span className="text-xl">{i}</span><span className="font-semibold">{l}</span><span className="ml-auto text-slate-300">›</span></Link>
+          <Link key={h} href={h} className="card flex items-center gap-3"><span className="text-xl">{i}</span><span className="font-semibold">{l}</span>{lockOf(h) && <span className="chip ml-1 bg-slate-100 text-[10px] text-slate-500">🔒 Pro</span>}<span className="ml-auto text-slate-300">›</span></Link>
         ))}
         <button className="btn-danger mt-6 w-full" onClick={async () => { await sb().auth.signOut(); router.replace("/connexion"); }}>Se déconnecter</button>
       </div>

@@ -2,10 +2,11 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { currentUser, sb } from "@/lib/supabase";
 import type { Company } from "@/lib/types";
+import { hasFeature, type Feature } from "@/lib/plans";
 
 export type Member = { user_id: string; company_id: string; role: "owner" | "supervisor" | "technician"; full_name?: string | null; email?: string | null };
-type Ctx = { company: Company | null; me: Member | null; team: Member[]; isSup: boolean; loaded: boolean; active: boolean; reload: () => Promise<void> };
-const C = createContext<Ctx>({ company: null, me: null, team: [], isSup: false, loaded: false, active: true, reload: async () => {} });
+type Ctx = { company: Company | null; me: Member | null; team: Member[]; isSup: boolean; loaded: boolean; active: boolean; has: (f: Feature) => boolean; reload: () => Promise<void> };
+const C = createContext<Ctx>({ company: null, me: null, team: [], isSup: false, loaded: false, active: true, has: () => true, reload: async () => {} });
 
 // Essai en cours ou abonnement actif (sinon : consultation seule)
 export const freeActive = (c?: Company | null) => !!c && c.plan === "free" && (!c.free_until || new Date(c.free_until).getTime() > Date.now());
@@ -35,6 +36,6 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
   }, []);
   useEffect(() => { reload(); }, [reload]);
   const isSup = !!me && me.role !== "technician";
-  return <C.Provider value={{ company, me, team, isSup, loaded, active: isActive(company), reload }}>{children}</C.Provider>;
+  return <C.Provider value={{ company, me, team, isSup, loaded, active: isActive(company), has: (f: Feature) => hasFeature(company, f), reload }}>{children}</C.Provider>;
 }
 export const useCompany = () => useContext(C);
