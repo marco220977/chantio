@@ -22,6 +22,8 @@ function Planning() {
   const [week, setWeek] = useState(startOfWeek(new Date()));
   const [list, setList] = useState<Iv[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [nc, setNc] = useState<Partial<Client> | null>(null); // nouveau client saisi depuis le planning
+  const [ncErr, setNcErr] = useState("");
   const [edit, setEdit] = useState<Iv | null>(null);
   const { team, me, isSup, company, has } = useCompany();
   const [who, setWho] = useState<string>("all");
@@ -192,7 +194,7 @@ function Planning() {
         })}
       </div>
       {edit && (
-        <Modal title={edit.id ? "Intervention" : edit._kind === "sav" ? "Nouveau SAV" : "Nouvelle intervention"} onClose={() => setEdit(null)}>
+        <Modal title={edit.id ? "Intervention" : edit._kind === "sav" ? "Nouveau SAV" : "Nouvelle intervention"} onClose={() => { setEdit(null); setNc(null); }}>
           <div className="space-y-3">
             {!edit.id && has("entretien") && (
               <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-200 p-1">
@@ -202,13 +204,49 @@ function Planning() {
               </div>
             )}
             <input className="input" placeholder={edit._kind === "sav" ? "Appareil / panne (ex : Chaudière en défaut F28)" : "Intitulé (ex : Remplacement mitigeur)"} value={edit.title} onChange={(e) => setEdit({ ...edit, title: e.target.value })} />
-            <select className="input" value={edit.client_id || ""} onChange={(e) => {
+            {!nc && <select className="input" value={edit.client_id || ""} onChange={(e) => {
+              if (e.target.value === "__new") { setNcErr(""); setNc({ type: "particulier" }); return; }
               const c = clients.find((x) => x.id === e.target.value);
               setEdit({ ...edit, client_id: e.target.value || null, address: edit.address || (c ? [c.address, c.zip, c.city].filter(Boolean).join(" ") : "") });
             }}>
               <option value="">— Client —</option>
+              <option value="__new">＋ Nouveau client…</option>
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            </select>}
+            {nc && (
+              <div className="space-y-2 rounded-xl border border-brand/30 bg-slate-50 p-3">
+                <p className="text-sm font-semibold">＋ Nouveau client <span className="font-normal text-slate-500">(ajouté au fichier clients)</span></p>
+                <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-200 p-1 text-xs">
+                  {[["particulier", "Particulier"], ["professionnel", "Professionnel"]].map(([k, l]) => (
+                    <button key={k} type="button" onClick={() => setNc({ ...nc, type: k })} className={`rounded-md py-1.5 font-semibold ${nc.type === k ? "bg-white shadow" : "text-slate-600"}`}>{l}</button>
+                  ))}
+                </div>
+                <input className="input" placeholder={nc.type === "professionnel" ? "Raison sociale *" : "Nom et prénom *"} value={nc.name || ""} onChange={(e) => setNc({ ...nc, name: e.target.value })} />
+                <div className="grid grid-cols-2 gap-2">
+                  <input className="input" type="tel" placeholder="Téléphone" value={nc.phone || ""} onChange={(e) => setNc({ ...nc, phone: e.target.value })} />
+                  <input className="input" type="email" placeholder="E-mail" value={nc.email || ""} onChange={(e) => setNc({ ...nc, email: e.target.value })} />
+                </div>
+                <input className="input" placeholder="Adresse (n° et rue)" value={nc.address || ""} onChange={(e) => setNc({ ...nc, address: e.target.value })} />
+                <div className="grid grid-cols-3 gap-2">
+                  <input className="input" inputMode="numeric" placeholder="CP" value={nc.zip || ""} onChange={(e) => setNc({ ...nc, zip: e.target.value })} />
+                  <input className="input col-span-2" placeholder="Ville" value={nc.city || ""} onChange={(e) => setNc({ ...nc, city: e.target.value })} />
+                </div>
+                {ncErr && <p className="text-xs text-red-600">{ncErr}</p>}
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" className="btn-ghost" onClick={() => setNc(null)}>Annuler</button>
+                  <button type="button" className="btn-brand" onClick={async () => {
+                    if (!nc.name?.trim()) return setNcErr("Indiquez le nom du client.");
+                    const row = { type: nc.type || "particulier", name: nc.name.trim(), phone: nc.phone?.trim() || null, email: nc.email?.trim().toLowerCase() || null,
+                      address: nc.address?.trim() || null, zip: nc.zip?.trim() || null, city: nc.city?.trim() || null };
+                    const { data, error } = await sb().from("clients").insert(row).select().single();
+                    if (error) return setNcErr(error.message);
+                    setClients([...clients, data].sort((a, b) => a.name.localeCompare(b.name)));
+                    setEdit({ ...edit, client_id: data.id, address: edit.address || [data.address, data.zip, data.city].filter(Boolean).join(" ") });
+                    setNc(null);
+                  }}>Ajouter le client</button>
+                </div>
+              </div>
+            )}
             <input className="input" placeholder="Adresse" value={edit.address || ""} onChange={(e) => setEdit({ ...edit, address: e.target.value })} />
             <div className="grid grid-cols-2 gap-2">
               <input type="datetime-local" className="input" value={localInput(edit.starts_at)} onChange={(e) => setEdit({ ...edit, starts_at: new Date(e.target.value).toISOString() })} />
