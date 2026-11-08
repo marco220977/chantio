@@ -31,6 +31,7 @@ function Editor() {
   const isNew = id === "nouveau";
   const [t, setT] = useState<Ticket | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
+  const [iv, setIv] = useState<{ id: string; starts_at: string; status: string } | null>(null); // RDV au planning
   const [contracts, setContracts] = useState<any[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<null | (() => Promise<any>)>(null);
@@ -78,6 +79,12 @@ function Editor() {
     })();
   }, [t?.client_id]);
 
+  useEffect(() => {
+    if (!t?.id) { setIv(null); return; }
+    sb().from("interventions").select("id, starts_at, status").eq("sav_id", t.id).in("status", ["planned", "to_confirm"]).order("starts_at", { ascending: false }).limit(1)
+      .then(({ data }) => setIv(data?.[0] || null));
+  }, [t?.id]);
+
   if (!t || !company) return <><Header back title="…" /><p className="p-6 text-center text-slate-400">Chargement…</p></>;
   const closed = t.status === "closed";
   const client = clients.find((x) => x.id === t.client_id);
@@ -122,9 +129,18 @@ function Editor() {
   }
 
   async function schedule() {
-    if (!t!.scheduled_at) return setErr("Choisissez la date du rendez-vous.");
-    const saved = await save({ status: "planned" }); if (!saved) return;
-    await sb().from("interventions").insert({ sav_id: saved.id, assigned_to: (saved as any).assigned_to || null, title: `SAV ${saved.number}${saved.equipment?.type ? " — " + equipmentLabel(saved.equipment) : ""}`, client_id: saved.client_id, address: saved.address || [saved.client_snapshot?.address, saved.client_snapshot?.zip, saved.client_snapshot?.city].filter(Boolean).join(" ") || null, starts_at: saved.scheduled_at, duration_min: 90, technician: saved.technician, notes: saved.problem });
+    if (!t!.scheduled_at) return setErr("Choisissez la date et l'heure du rendez-vous.");
+    const saved = await save(["open", ""].includes(t!.status || "") ? { status: "planned" } : {}); if (!saved) return;
+    const tech = { assigned_to: (saved as any).assigned_to || null, technician: saved.technician || null };
+    if (iv) {
+      const { error } = await sb().from("interventions").update({ starts_at: saved.scheduled_at, ...tech, status: "planned" }).eq("id", iv.id);
+      if (error) return setErr(error.message);
+      setIv({ ...iv, starts_at: saved.scheduled_at!, status: "planned" });
+      return flash("🗓 Rendez-vous mis à jour dans le planning");
+    }
+    const { data, error } = await sb().from("interventions").insert({ sav_id: saved.id, ...tech, title: `SAV ${saved.number}${saved.equipment?.type ? " — " + equipmentLabel(saved.equipment) : ""}`, client_id: saved.client_id, address: saved.address || [saved.client_snapshot?.address, saved.client_snapshot?.zip, saved.client_snapshot?.city].filter(Boolean).join(" ") || null, starts_at: saved.scheduled_at, duration_min: (company as any)?.booking_duration_min || 90, notes: saved.problem, status: "planned" }).select("id, starts_at, status").single();
+    if (error) return setErr(error.message);
+    setIv(data);
     flash("🗓 Rendez-vous ajouté au planning");
   }
 
@@ -189,25 +205,27 @@ function Editor() {
           {t.contract_id && <Link href={`/app/entretien/contrat/${t.contract_id}`} className="text-sm text-brand">🔧 Contrat d'entretien rattaché</Link>}
         </section>
 
+        {!closed && (
+          <section className="card space-y-3 border-l-4 border-l-flame">
+            <h2 className="font-bold">🗓 Rendez-vous et planning</h2>
+            {iv && <p className="rounded-lg bg-blue-50 p-2 text-sm text-blue-900">📅 Au planning le <b>{new Date(iv.starts_at).toLocaleString("fr-FR", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}</b>{iv.status === "to_confirm" ? " (réservé par le client, à confirmer)" : ""} · <Link href="/app/planning" className="text-brand underline">Voir le planning</Link></p>}
+            <div className="grid grid-cols-2 gap-2">
+              <div><label className="label">Date et heure</label><input type="datetime-local" className="input" value={localInput(t.scheduled_at)} onChange={(e) => set({ scheduled_at: e.target.value ? new Date(e.target.value).toISOString() : null })} /></div>
+              <div><label className="label">Technicien</label><select className="input" value={(t as any).assigned_to || ""} onChange={(e) => { const m = team.find((x) => x.user_id === e.target.value); set({ assigned_to: e.target.value || null, technician: m ? memberName(m) : "" } as any); }}>
+                <option value="">— Technicien —</option>
+                {team.map((m) => <option key={m.user_id} value={m.user_id}>{memberName(m)}</option>)}
+              </select></div>
+            </div>
+            {!["resolved"].includes(t.status) && <button className="btn-brand w-full" disabled={!!busy} onClick={schedule}>{iv ? "🔁 Mettre à jour le rendez-vous" : "🗓 Ajouter au planning"}</button>}
+            {t.id && !["resolved"].includes(t.status) && <RdvLink ticket={t} companyName={company?.name || ""} onToken={(tk) => setT({ ...t, booking_token: tk } as any)} />}
+          </section>
+        )}
+
         <section className="card">
           <h2 className="mb-3 font-bold">Équipement concerné</h2>
           <EquipmentForm value={t.equipment} disabled={closed} onChange={(e) => set({ equipment: e })} />
         </section>
 
-        {t.id && (
-          <section className="card space-y-3">
-            <h2 className="font-bold">Rendez-vous</h2>
-            <div className="grid grid-cols-2 gap-2">
-              <input type="datetime-local" className="input" disabled={closed} value={localInput(t.scheduled_at)} onChange={(e) => set({ scheduled_at: e.target.value ? new Date(e.target.value).toISOString() : null })} />
-              <select className="input" disabled={closed} value={(t as any).assigned_to || ""} onChange={(e) => { const m = team.find((x) => x.user_id === e.target.value); set({ assigned_to: e.target.value || null, technician: m ? memberName(m) : "" } as any); }}>
-                <option value="">— Technicien —</option>
-                {team.map((m) => <option key={m.user_id} value={m.user_id}>{memberName(m)}</option>)}
-              </select>
-            </div>
-            {t.status === "open" && <button className="btn-ghost w-full" onClick={schedule}>🗓 Planifier et ajouter au planning</button>}
-            {t.id && !closed && !["resolved"].includes(t.status) && <RdvLink ticket={t} companyName={company?.name || ""} onToken={(tk) => setT({ ...t, booking_token: tk } as any)} />}
-          </section>
-        )}
 
         {t.id && (
           <section className="card space-y-3">
