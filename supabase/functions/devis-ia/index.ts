@@ -46,6 +46,34 @@ async function subscriptionOk(req: Request): Promise<boolean> {
 }
 const SUB_MSG = "Essai gratuit terminé : abonnez-vous (Menu → Abonnement) pour utiliser l'intelligence artificielle.";
 
+function extractJson(txt: string): any | null {
+  const t = txt.replace(/```(?:json)?/g, "");
+  for (let i = t.indexOf("{"); i >= 0; i = t.indexOf("{", i + 1)) {
+    let depth = 0, inStr = false, esc = false;
+    for (let k = i; k < t.length; k++) {
+      const c = t[k];
+      if (inStr) { if (esc) esc = false; else if (c === "\\") esc = true; else if (c === '"') inStr = false; continue; }
+      if (c === '"') inStr = true;
+      else if (c === "{") depth++;
+      else if (c === "}" && --depth === 0) {
+        try { const o = JSON.parse(t.slice(i, k + 1)); if (o && Array.isArray(o.lines)) return o; } catch {}
+        break;
+      }
+    }
+  }
+  return null;
+}
+
+async function callClaude(key: string, body: unknown) {
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const j = await r.json().catch(() => ({}));
+  return { r, j };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (!(await subscriptionOk(req))) return json({ error: SUB_MSG }, 402);
@@ -59,14 +87,21 @@ Deno.serve(async (req) => {
   const m = /^data:(image\/\w+);base64,(.+)$/.exec(image || "");
   if (m) content.push({ type: "image", source: { type: "base64", media_type: m[1], data: m[2] } });
   content.push({ type: "text", text: PROMPT(String(description).slice(0, 4000), cat, Number(vat) || 10) + (m ? "\nUne photo du chantier est jointe : sers-t'en pour préciser le matériel existant." : "") });
-  const r = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    body: JSON.stringify({ model: Deno.env.get("ANTHROPIC_MODEL") || "claude-sonnet-5-5", max_tokens: 3000, messages: [{ role: "user", content }] }),
-  });
-  const j = await r.json().catch(() => ({}));
+  const model = Deno.env.get("ANTHROPIC_MODEL") || "claude-sonnet-5-5";
+  const { r, j } = await callClaude(key, { model, max_tokens: 12000, messages: [{ role: "user", content }] });
   if (!r.ok) { console.error("Anthropic error", r.status, j?.error?.message); return json({ error: frError(j?.error?.message || "", r.status) }, 502); }
-  const txt: string = j.content?.find((c: any) => c.type === "text")?.text || "{}";
-  try { return json(JSON.parse(txt.slice(txt.indexOf("{"), txt.lastIndexOf("}") + 1))); }
-  catch { return json({ error: "Réponse IA illisible, réessayez." }, 502); }
+  const txt: string = (j.content || []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
+  let out = extractJson(txt);
+  if (!out && txt.trim()) {
+    // Réponse coupée ou mal formée : on demande de la remettre au propre
+    console.error("devis-ia unparsable", j.stop_reason, txt.slice(-300));
+    const again = await callClaude(key, { model, max_tokens: 12000, messages: [
+      { role: "user", content },
+      { role: "assistant", content: txt.slice(0, 30000).trimEnd() || "{" },
+      { role: "user", content: "Ta réponse est incomplète ou n'est pas un JSON valide. Renvoie UNIQUEMENT le JSON complet et valide, au format demandé, avec des désignations courtes (regroupe les petites fournitures si besoin)." },
+    ] });
+    if (again.r.ok) out = extractJson((again.j.content || []).filter((c: any) => c.type === "text").map((c: any) => c.text).join(""));
+  }
+  if (!out) return json({ error: "Réponse IA illisible, réessayez." }, 502);
+  return json(out);
 });
