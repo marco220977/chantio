@@ -1,5 +1,7 @@
 "use client";
 import Link from "next/link";
+import ClientPicker from "@/components/ClientPicker";
+import PlanningBlock from "@/components/PlanningBlock";
 import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { currentUser, sb } from "@/lib/supabase";
@@ -206,9 +208,9 @@ function Editor() {
         <section className="card space-y-3">
           <span className="label !mb-0">Client (maître d'ouvrage)</span>
           {editable ? (
-            <select className="input" value={r.client_id || ""} onChange={(e) => { const x = clients.find((k) => k.id === e.target.value); set({ client_id: e.target.value, address: r.address || (x ? [x.address, x.zip, x.city].filter(Boolean).join(" ") : "") }); }}>
-              <option value="">— Choisir —</option>{clients.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-            </select>
+            <ClientPicker clients={clients} value={r.client_id} placeholder="— Choisir —"
+              onCreated={(x) => setClients((l) => [...l, x].sort((a, b) => a.name.localeCompare(b.name)))}
+              onChange={(x) => set({ client_id: x?.id || null, address: r.address || (x ? [x.address, x.zip, x.city].filter(Boolean).join(" ") : "") } as any)} />
           ) : <p className="font-semibold">{r.client_snapshot?.name}</p>}
           <div><label className="label">Lieu des travaux</label><input className="input" disabled={!editable} value={r.address || ""} onChange={(e) => set({ address: e.target.value })} /></div>
           <div><label className="label">Nature des travaux</label><textarea className="input text-sm" rows={4} disabled={!editable} value={r.works || ""} onChange={(e) => set({ works: e.target.value })} placeholder="Ex : Remplacement chaudière gaz par PAC air/eau 8 kW" /></div>
@@ -223,6 +225,21 @@ function Editor() {
             </div>
           )}
         </section>
+
+        {editable && (
+          <PlanningBlock address={r.address || [client?.address, client?.zip, client?.city].filter(Boolean).join(" ")} interventionId={r.intervention_id}
+            onSchedule={async (when, tech, duration) => {
+              if (!r.client_id && !r.client_snapshot) { setErr("Choisissez d'abord le client."); return null; }
+              const addr = r.address || [client?.address, client?.zip, client?.city].filter(Boolean).join(" ") || null;
+              const { data, error } = await sb().from("interventions").insert({ title: `Intervention${r.works ? " — " + r.works.split("\n")[0].slice(0, 60) : ""}`,
+                client_id: r.client_id || null, address: addr, starts_at: when, duration_min: duration, ...tech, notes: r.works || null, status: "planned" }).select("id").single();
+              if (error) { setErr(error.message); return null; }
+              // Le quitus est enregistré avec le lien vers ce rendez-vous
+              const saved = await save({ intervention_id: data.id, address: addr || r.address } as any);
+              if (!saved) { await sb().from("interventions").delete().eq("id", data.id); return null; }
+              return data.id;
+            }} />
+        )}
 
         <section className="card space-y-3">
           <h2 className="font-bold">Réserves</h2>
