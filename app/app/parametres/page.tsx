@@ -59,6 +59,20 @@ function Settings() {
   );
 
   async function save() {
+    // Changement d'entreprise (SIREN différent) : confirmation avant d'enregistrer
+    const siren = (v?: string | null) => String(v || "").replace(/\D/g, "").slice(0, 9);
+    const oldS = siren(company?.siret), newS = siren(c.siret);
+    if (oldS.length === 9 && newS.length === 9 && oldS !== newS) {
+      const paying = company?.plan === "pro" || company?.plan === "free";
+      const { data: used } = paying ? { data: false } : await sb().rpc("siren_trial_used", { p_siret: newS });
+      const left = Math.ceil((new Date(company?.trial_ends_at || 0).getTime() - Date.now()) / 86400000);
+      const trialMsg = paying ? "Votre formule actuelle reste inchangée."
+        : used ? "⚠️ Cette entreprise a déjà bénéficié d'un essai gratuit : l'essai s'arrête dès l'enregistrement et l'abonnement est à payer pour continuer."
+        : left > 0 ? `Vous gardez le temps d'essai restant (${left} jour${left > 1 ? "s" : ""}, jusqu'au ${new Date(company!.trial_ends_at!).toLocaleDateString("fr-FR")}), sans nouvel essai : l'abonnement sera à payer à la fin de cette période.`
+        : "Votre essai est terminé : l'abonnement est nécessaire pour continuer.";
+      const ok = confirm(`🏢 Ce SIRET correspond à une AUTRE ENTREPRISE (SIREN ${newS} au lieu de ${oldS}).\n\nElle sera considérée comme une nouvelle entreprise :\n• ${trialMsg}\n• Vos clients, devis et factures restent dans ce compte ; les prochains documents porteront les informations de la nouvelle entreprise.\n\nConfirmer le changement d'entreprise ?`);
+      if (!ok) return;
+    }
     const { id, plan, trial_ends_at, ...rest } = c as any;
     delete rest.stripe_customer_id; delete rest.stripe_subscription_id; delete rest.created_at;
     for (const k of ["rge_valid_until"]) if (rest[k] === "") rest[k] = null;

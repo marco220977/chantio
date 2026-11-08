@@ -6,7 +6,7 @@ import { sb } from "@/lib/supabase";
 import Header from "@/components/Header";
 
 const PRICE_HT = 29; // € HT / mois
-type Co = { id: string; name: string; email?: string; city?: string; plan?: string; free_until?: string | null; trial_ends_at?: string; cancel_at?: string | null; created_at: string;
+type Co = { id: string; name: string; email?: string; city?: string; plan?: string; free_until?: string | null; siren_changed_at?: string | null; trial_ends_at?: string; cancel_at?: string | null; created_at: string;
   referred: boolean; referrer?: string | null; members: number; quotes: number; invoices: number; last_seen?: string | null };
 
 const statusOf = (c: Co, now: number) =>
@@ -100,7 +100,7 @@ export default function Admin() {
                 <span className={`chip shrink-0 ${st[1]}`}>{st[0]}</span>
               </div>
               <p className="text-xs text-slate-500">
-                Inscrit le {d(c.created_at)}{statusOf(c, now) === "essai" || statusOf(c, now) === "expire" ? ` · fin d'essai ${d(c.trial_ends_at)}` : ""}{c.cancel_at ? ` · fin le ${d(c.cancel_at)}` : ""}
+                Inscrit le {d(c.created_at)}{statusOf(c, now) === "essai" || statusOf(c, now) === "expire" ? ` · fin d'essai ${d(c.trial_ends_at)}` : ""}{c.cancel_at ? ` · fin le ${d(c.cancel_at)}` : ""}{c.siren_changed_at ? ` · 🔁 entreprise (SIREN) changée le ${d(c.siren_changed_at)}` : ""}
                 {c.referrer ? ` · parrain : ${c.referrer}` : ""}
               </p>
               <p className="text-xs text-slate-500">👥 {c.members} · 📝 {c.quotes} devis · 💶 {c.invoices} factures · vu le {d(c.last_seen)}</p>
