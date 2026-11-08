@@ -1,15 +1,16 @@
 "use client";
 import Link from "next/link";
+import GiftLinks from "@/components/GiftLinks";
 import { useEffect, useMemo, useState } from "react";
 import { sb } from "@/lib/supabase";
 import Header from "@/components/Header";
 
 const PRICE_HT = 29; // € HT / mois
-type Co = { id: string; name: string; email?: string; city?: string; plan?: string; trial_ends_at?: string; cancel_at?: string | null; created_at: string;
+type Co = { id: string; name: string; email?: string; city?: string; plan?: string; free_until?: string | null; trial_ends_at?: string; cancel_at?: string | null; created_at: string;
   referred: boolean; referrer?: string | null; members: number; quotes: number; invoices: number; last_seen?: string | null };
 
 const statusOf = (c: Co, now: number) =>
-  c.plan === "free" ? "offert" : c.plan === "pro" ? (c.cancel_at ? "resiliation" : "abonne") : c.plan === "canceled" ? "resilie"
+  c.plan === "free" ? (!c.free_until || new Date(c.free_until).getTime() > now ? "offert" : "expire") : c.plan === "pro" ? (c.cancel_at ? "resiliation" : "abonne") : c.plan === "canceled" ? "resilie"
   : new Date(c.trial_ends_at || 0).getTime() > now ? "essai" : "expire";
 const ST: Record<string, [string, string]> = {
   abonne: ["Abonné", "bg-green-100 text-green-800"], offert: ["Accès offert", "bg-purple-100 text-purple-800"], resiliation: ["Résiliation prévue", "bg-amber-100 text-amber-800"],
@@ -81,9 +82,11 @@ export default function Admin() {
           </section>
         )}
 
+        <GiftLinks />
+
         <input className="input" placeholder="Rechercher une entreprise…" value={q} onChange={(e) => setQ(e.target.value)} />
         <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4">
-          {[["all", "Tous"], ["abonne", "Abonnés"], ["essai", "Essai"], ["expire", "Essai terminé"], ["resiliation", "Résiliation prévue"], ["resilie", "Résiliés"]].map(([f, l]) => (
+          {[["all", "Tous"], ["abonne", "Abonnés"], ["offert", "Offerts"], ["essai", "Essai"], ["expire", "Essai terminé"], ["resiliation", "Résiliation prévue"], ["resilie", "Résiliés"]].map(([f, l]) => (
             <button key={f} onClick={() => setFilter(f)} className={`chip whitespace-nowrap border py-1.5 ${filter === f ? "border-ink bg-ink text-white" : "border-slate-200 bg-white"}`}>{l}</button>
           ))}
         </div>

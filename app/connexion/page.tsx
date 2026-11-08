@@ -21,6 +21,10 @@ function Form() {
   const [busy, setBusy] = useState(false);
   const [accept, setAccept] = useState(false);
   const parrain = (params.get("parrain") || "").toUpperCase();
+  const offert = (params.get("offert") || "").toUpperCase();
+  const [gift, setGift] = useState<{ valid: boolean; months: number | null } | null>(null);
+  useEffect(() => { if (offert) sb().rpc("gift_info", { p_code: offert }).then(({ data }) => setGift(data || { valid: false, months: null })); }, [offert]);
+  const giftOk = !!gift?.valid;
   const [parrainName, setParrainName] = useState("");
   useEffect(() => { if (parrain) sb().rpc("referral_info", { p_code: parrain }).then(({ data }) => setParrainName(data?.name || "")); }, [parrain]);
 
@@ -30,7 +34,7 @@ function Form() {
     if (signup) {
       const { data, error } = await s.auth.signUp({
         email, password,
-        options: { data: { company_name: company, full_name: name, ...(parrainName ? { referral_code: parrain } : {}) }, emailRedirectTo: `${location.origin}/app` },
+        options: { data: { company_name: company, full_name: name, ...(parrainName ? { referral_code: parrain } : {}), ...(giftOk ? { gift_code: offert } : {}) }, emailRedirectTo: `${location.origin}/app` },
       });
       if (error) setMsg(frError(error.message));
       // Adresse déjà inscrite : Supabase renvoie un faux succès sans identité
@@ -41,7 +45,7 @@ function Form() {
     } else {
       const { error } = await s.auth.signInWithPassword({ email, password });
       if (error) setMsg("E-mail ou mot de passe incorrect.");
-      else router.replace("/app");
+      else router.replace(giftOk ? `/offert/${offert}` : "/app");
     }
     setBusy(false);
   }
@@ -56,6 +60,9 @@ function Form() {
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-100 to-orange-50 p-5">
       <form onSubmit={submit} className="card w-full max-w-sm space-y-4 p-6">
         <h1 className="text-2xl font-extrabold">{signup ? "Créer mon compte" : "Connexion"}</h1>
+        {offert && gift && (giftOk
+          ? <p className="rounded-lg bg-green-50 p-3 text-sm text-green-800">🎁 Accès offert {gift.months ? `pendant ${gift.months} mois` : "sans limite de durée"} : {signup ? "créez votre compte, il sera activé automatiquement." : "connectez-vous pour l'activer sur votre compte."}</p>
+          : <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Ce lien d'accès offert n'est plus valable (déjà utilisé ou expiré).</p>)}
         {signup && parrainName && <p className="rounded-lg bg-green-50 p-3 text-sm text-green-800">🎁 Invité par <b>{parrainName}</b> : <b>30 jours d'essai gratuit</b> au lieu de 14.</p>}
         {signup && (
           <>
