@@ -7,9 +7,10 @@ import Header from "@/components/Header";
 import Modal from "@/components/Modal";
 import type { Client } from "@/lib/types";
 import { memberName, useCompany } from "@/components/CompanyContext";
+import { estimateMin, geocode, type Pt } from "@/lib/booking";
 
 type Iv = { id?: string; assigned_to?: string | null; title: string; client_id?: string | null; document_id?: string | null; address?: string; starts_at: string; duration_min: number; technician?: string; status: string; notes?: string; clients?: { name: string; phone?: string } | null;
-  sav_id?: string | null; billable?: boolean; price_ht?: number | null; vat_rate?: number; invoice_id?: string | null; _kind?: "intervention" | "sav" };
+  sav_id?: string | null; lat?: number | null; lng?: number | null; booked_by_client?: boolean; billable?: boolean; price_ht?: number | null; vat_rate?: number; invoice_id?: string | null; _kind?: "intervention" | "sav" };
 
 const startOfWeek = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
 const localInput = (iso: string) => { const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
@@ -22,7 +23,7 @@ function Planning() {
   const [list, setList] = useState<Iv[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [edit, setEdit] = useState<Iv | null>(null);
-  const { team, me, isSup } = useCompany();
+  const { team, me, isSup, company } = useCompany();
   const [who, setWho] = useState<string>("all");
   useEffect(() => { if (me && !isSup) setWho(me.user_id); }, [me, isSup]);
 
@@ -55,6 +56,12 @@ function Planning() {
     const { id, clients: _c, _kind, ...row } = { ...edit, ...over };
     if (!id && _kind === "sav") return createSav(row);
     if (!row.billable) { row.price_ht = null; }
+    const prev = id ? list.find((x) => x.id === id) : undefined;
+    if (prev && (prev.address || "") !== (row.address || "")) { row.lat = null; row.lng = null; }
+    if (row.status !== "done" && row.status !== "canceled") {
+      const warn = await overlapWarning({ ...row, id } as Iv);
+      if (warn && !confirm(warn)) return;
+    }
     const wasDone = id ? list.find((x) => x.id === id)?.status === "done" : false;
     const { data: saved } = id ? await sb().from("interventions").update(row).eq("id", id).select().single() : await sb().from("interventions").insert(row).select().single();
     setEdit(null);
@@ -64,6 +71,44 @@ function Planning() {
     }
     load();
   }
+  // Alerte si le RDV empiète sur un autre RDV du même technicien (marge + trajet compris)
+  async function overlapWarning(iv: Iv): Promise<string> {
+    if (!iv.assigned_to || !iv.starts_at) return "";
+    const buf = (company as any)?.booking_buffer_min ?? 15;
+    const day = new Date(iv.starts_at).toDateString();
+    const others = list.filter((x) => x.id !== iv.id && x.assigned_to === iv.assigned_to && ["planned", "to_confirm"].includes(x.status) && new Date(x.starts_at).toDateString() === day);
+    if (!others.length) return "";
+    const here: Pt | null = iv.lat != null && iv.lng != null ? { lat: iv.lat!, lng: iv.lng! } : iv.address ? await geocode(iv.address) : null;
+    const pos = async (x: Iv): Promise<Pt | null> => (x.lat != null && x.lng != null ? { lat: x.lat!, lng: x.lng! } : x.address ? await geocode(x.address) : null);
+    const s0 = new Date(iv.starts_at).getTime(), e0 = s0 + (Number(iv.duration_min) || 60) * 60000;
+    const hhmm = (t: number) => new Date(t).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    const lines: string[] = [];
+    for (const x of others) {
+      const s1 = new Date(x.starts_at).getTime(), e1 = s1 + (x.duration_min || 60) * 60000;
+      const p = await pos(x);
+      const trip = here && p ? estimateMin(here, p) : 0;
+      const gap = (buf + trip) * 60000;
+      const who = `${hhmm(s1)} · ${x.title || x.clients?.name || "RDV"}`;
+      if (s1 >= s0 && s1 < e0 + gap) lines.push(`• ${who} : il faudrait finir avant ${hhmm(s1 - gap)} (marge ${buf} min${trip ? ` + trajet ≈ ${trip} min` : ""}).`);
+      else if (s1 < s0 && e1 + gap > s0) lines.push(`• ${who} : il se termine à ${hhmm(e1)}, ce RDV ne peut pas commencer avant ${hhmm(e1 + gap)} (marge ${buf} min${trip ? ` + trajet ≈ ${trip} min` : ""}).`);
+    }
+    return lines.length ? `⚠️ Ce rendez-vous empiète sur un autre RDV du même technicien :\n${lines.join("\n")}\n\nEnregistrer quand même ? (Pensez au bouton ⏱ pour prévenir le client suivant du retard.)` : "";
+  }
+
+  // Prévient le client d'un retard (SMS ou e-mail, sinon SMS depuis le téléphone)
+  async function delay(i: Iv) {
+    const v = prompt(`Retard prévu pour ${i.clients?.name || i.title} (en minutes) ?`, "30");
+    const min = Math.round(Number(String(v || "").replace(",", ".")));
+    if (!min || min < 1) return;
+    const { data: { session } } = await sb().auth.getSession();
+    const r = await fetch("/api/rdv/delay", { method: "POST", headers: { "content-type": "application/json", Authorization: `Bearer ${session?.access_token}` }, body: JSON.stringify({ id: i.id, minutes: min }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return alert(j.error || "Envoi impossible");
+    if (j.sms || j.email) return alert(`✅ Client prévenu par ${[j.sms && "SMS", j.email && "e-mail"].filter(Boolean).join(" et ")}.`);
+    if (j.phone) { location.href = `sms:${j.phone}?body=${encodeURIComponent(j.text)}`; return; }
+    alert("Aucun numéro ni e-mail pour ce client : appelez-le.");
+  }
+
   // Nouveau SAV depuis le planning : fiche SAV numérotée + intervention liée
   // Confirme un RDV réservé en ligne et prévient le client (e-mail + SMS)
   async function confirmRdv(id: string) {
@@ -137,6 +182,7 @@ function Planning() {
                   </button>
                   <div className="flex flex-col border-l border-slate-100">
                     {i.status === "to_confirm" && <button className="flex-1 px-3 text-xs font-semibold text-emerald-700" onClick={() => confirmRdv(i.id!)}>✅<br />Confirmer</button>}
+                    {["planned", "to_confirm"].includes(i.status) && new Date(i.starts_at).getTime() + (i.duration_min || 60) * 60000 > Date.now() && <button className="flex-1 px-3 text-lg text-slate-400" aria-label="Prévenir du retard" title="Prévenir du retard" onClick={() => delay(i)}>⏱</button>}
                     <button className="flex-1 px-4 text-xl text-slate-400" aria-label="Modifier l'intervention" onClick={() => setEdit(i)}>✏️</button>
                   </div>
                 </div>

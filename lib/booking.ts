@@ -35,7 +35,7 @@ export function km(a: Pt, b: Pt) {
   const x = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(x));
 }
-const estimateMin = (a: Pt, b: Pt) => { const k = km(a, b); return k < 0.2 ? 0 : Math.round((k * 1.3) / 40 * 60 + 5); };
+export const estimateMin = (a: Pt, b: Pt) => { const k = km(a, b); return k < 0.2 ? 0 : Math.round((k * 1.3) / 40 * 60 + 5); };
 
 export async function geocode(q: string): Promise<Pt | null> {
   if (!q || q.trim().length < 5) return null;
