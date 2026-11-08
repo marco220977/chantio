@@ -159,6 +159,19 @@ function Settings() {
           {F({ k: "rge_domains", label: "Domaines", ph: "PAC, chaudière biomasse, chauffe-eau thermodynamique…" })}
         </section>
         <section className="card space-y-3">
+          <h2 className="font-bold">📲 Prise de RDV SAV par le client</h2>
+          <p className="text-xs text-slate-500">Depuis une fiche SAV, envoyez au client un lien : il choisit parmi les créneaux où un technicien est déjà dans son secteur (trajets optimisés). Point de départ des tournées : l'adresse de l'entreprise ci-dessus.</p>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={c.booking_enabled ?? true} onChange={(e) => setC({ ...c, booking_enabled: e.target.checked })} /> Activer la prise de RDV en ligne</label>
+          <div className="grid grid-cols-2 gap-2">
+            {F({ k: "booking_day_start", label: "Début de journée", type: "time" })}{F({ k: "booking_day_end", label: "Fin de journée", type: "time" })}
+            {F({ k: "booking_duration_min", label: "Durée d'un SAV (min)", type: "number" })}{F({ k: "booking_buffer_min", label: "Marge entre RDV (min)", type: "number" })}
+            {F({ k: "booking_max_km", label: "Zone maxi (km)", type: "number" })}{F({ k: "booking_days_ahead", label: "Réservable sur (jours)", type: "number" })}
+          </div>
+          {F({ k: "booking_keep_free", label: "Temps gardé libre pour les urgences (min par jour et par technicien)", type: "number" })}
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!c.booking_saturday} onChange={(e) => setC({ ...c, booking_saturday: e.target.checked })} /> Proposer le samedi</label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!c.booking_auto_confirm} onChange={(e) => setC({ ...c, booking_auto_confirm: e.target.checked })} /> Confirmer automatiquement (sinon : « à confirmer » dans le planning)</label>
+        </section>
+        <section className="card space-y-3">
           <h2 className="font-bold">Assurance et paiement</h2>
           {F({ k: "insurance", label: "Assurance décennale (obligatoire)", ph: "Assureur, n° de contrat, couverture géographique" })}
           {F({ k: "iban", label: "IBAN" })}{F({ k: "bic", label: "BIC" })}

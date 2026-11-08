@@ -16,6 +16,7 @@ import { pdfToBase64, shareOrSave } from "@/lib/pdf-maintenance";
 import { removeMedia, signedUrls, uploadPhoto } from "@/lib/chantiers";
 import { MediaButtons, MediaGrid } from "@/components/Media";
 import Diagnostic from "@/components/Diagnostic";
+import RdvLink from "@/components/RdvLink";
 import { askEmail, sendMail, snapshotOf } from "@/lib/send";
 import type { Client } from "@/lib/types";
 
@@ -203,6 +204,7 @@ function Editor() {
               </select>
             </div>
             {t.status === "open" && <button className="btn-ghost w-full" onClick={schedule}>🗓 Planifier et ajouter au planning</button>}
+            {t.id && !closed && !["resolved"].includes(t.status) && <RdvLink ticket={t} companyName={company?.name || ""} onToken={(tk) => setT({ ...t, booking_token: tk } as any)} />}
           </section>
         )}
 

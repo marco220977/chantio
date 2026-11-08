@@ -115,14 +115,19 @@ function Planning() {
               </div>
               {items.length === 0 && <p className="text-xs text-slate-400">—</p>}
               {items.map((i) => (
-                <div key={i.id} className={`card mb-2 flex w-full items-stretch gap-2 border-l-4 !p-0 ${i.status === "done" ? "border-l-green-500 opacity-70" : i.status === "canceled" ? "border-l-red-400 opacity-50" : "border-l-flame"}`}>
+                <div key={i.id} className={`card mb-2 flex w-full items-stretch gap-2 border-l-4 !p-0 ${i.status === "done" ? "border-l-green-500 opacity-70" : i.status === "canceled" ? "border-l-red-400 opacity-50" : i.status === "to_confirm" ? "border-l-amber-400 bg-amber-50/40" : "border-l-flame"}`}>
                   <button className="flex-1 p-4 text-left" onClick={() => router.push(i.sav_id ? `/app/sav/${i.sav_id}` : `/app/quitus/nouveau?intervention=${i.id}`)}>
                     <p className="font-semibold">{new Date(i.starts_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · {i.title}</p>
                     <p className="text-sm text-slate-500">{[i.clients?.name, i.address].filter(Boolean).join(" · ")}</p>
                     <p className="text-xs font-semibold text-brand">{i.sav_id ? "🛠 Ouvrir la fiche SAV →" : i.id && quitus[i.id] ? (quitus[i.id].status === "draft" ? "📝 Quitus à signer →" : "✅ Quitus signé →") : "📝 Quitus d'intervention →"}</p>
+                    {i.status === "to_confirm" && <p className="text-xs font-semibold text-amber-700">🟡 Réservé en ligne par le client — à confirmer</p>}
+                    {(i as any).booked_by_client && i.status !== "to_confirm" && <p className="text-xs text-slate-400">📲 Réservé en ligne par le client</p>}
                     <p className="text-xs text-slate-400">👷 {i.technician || "Non attribué"}{i.billable ? ` · 💶 ${i.price_ht ? Number(i.price_ht).toLocaleString("fr-FR", { style: "currency", currency: "EUR" }) + " HT" : "facturable"}` : ""}{i.invoice_id ? " · facturée" : ""}</p>
                   </button>
-                  <button className="border-l border-slate-100 px-4 text-xl text-slate-400" aria-label="Modifier l'intervention" onClick={() => setEdit(i)}>✏️</button>
+                  <div className="flex flex-col border-l border-slate-100">
+                    {i.status === "to_confirm" && <button className="flex-1 px-3 text-xs font-semibold text-emerald-700" onClick={async () => { await sb().from("interventions").update({ status: "planned" }).eq("id", i.id); setList(list.map((x) => (x.id === i.id ? { ...x, status: "planned" } : x))); }}>✅<br />Confirmer</button>}
+                    <button className="flex-1 px-4 text-xl text-slate-400" aria-label="Modifier l'intervention" onClick={() => setEdit(i)}>✏️</button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -179,7 +184,7 @@ function Planning() {
               </div>
             )}
             <select className="input" value={edit.status} onChange={(e) => { setEdit({ ...edit, status: e.target.value }); if (e.target.value === "done" && edit.id && edit.title) save({ status: "done" }); }}>
-              <option value="planned">Prévue</option><option value="done">Terminée</option><option value="canceled">Annulée</option>
+              <option value="planned">Prévue</option><option value="to_confirm">À confirmer (réservé par le client)</option><option value="done">Terminée</option><option value="canceled">Annulée</option>
             </select>
             {edit._kind !== "sav" && edit.id && quitus[edit.id] && <button className="btn-ghost w-full" onClick={() => router.push(`/app/quitus/${quitus[edit.id!].id}`)}>{quitus[edit.id].status === "draft" ? "📝 Faire signer le quitus" : "✅ Voir le quitus signé"}</button>}
             {edit.id && !quitus[edit.id] && edit.status === "done" && <button className="btn-ghost w-full" onClick={() => router.push(`/app/quitus/nouveau?intervention=${edit.id}`)}>📝 Quitus d'intervention</button>}
