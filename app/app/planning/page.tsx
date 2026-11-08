@@ -65,6 +65,17 @@ function Planning() {
     load();
   }
   // Nouveau SAV depuis le planning : fiche SAV numérotée + intervention liée
+  // Confirme un RDV réservé en ligne et prévient le client (e-mail + SMS)
+  async function confirmRdv(id: string) {
+    const { data: { session } } = await sb().auth.getSession();
+    const r = await fetch("/api/rdv/confirm", { method: "POST", headers: { "content-type": "application/json", Authorization: `Bearer ${session?.access_token}` }, body: JSON.stringify({ id }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return alert(j.error || "Confirmation impossible");
+    setList((l) => l.map((x) => (x.id === id ? { ...x, status: "planned" } : x)));
+    const sent = [j.email && "e-mail", j.sms && "SMS"].filter(Boolean).join(" et ");
+    alert(`✅ Rendez-vous confirmé.${sent ? ` Le client a été prévenu par ${sent}.` : " Aucun e-mail ni numéro (ou SMS désactivés) : prévenez le client par téléphone."}${j.errors?.length ? `\n⚠️ ${j.errors.join("\n")}` : ""}`);
+  }
+
   async function createSav(row: any) {
     if (!row.client_id) return alert("Choisissez le client.");
     const s = sb();
@@ -125,7 +136,7 @@ function Planning() {
                     <p className="text-xs text-slate-400">👷 {i.technician || "Non attribué"}{i.billable ? ` · 💶 ${i.price_ht ? Number(i.price_ht).toLocaleString("fr-FR", { style: "currency", currency: "EUR" }) + " HT" : "facturable"}` : ""}{i.invoice_id ? " · facturée" : ""}</p>
                   </button>
                   <div className="flex flex-col border-l border-slate-100">
-                    {i.status === "to_confirm" && <button className="flex-1 px-3 text-xs font-semibold text-emerald-700" onClick={async () => { await sb().from("interventions").update({ status: "planned" }).eq("id", i.id); setList(list.map((x) => (x.id === i.id ? { ...x, status: "planned" } : x))); }}>✅<br />Confirmer</button>}
+                    {i.status === "to_confirm" && <button className="flex-1 px-3 text-xs font-semibold text-emerald-700" onClick={() => confirmRdv(i.id!)}>✅<br />Confirmer</button>}
                     <button className="flex-1 px-4 text-xl text-slate-400" aria-label="Modifier l'intervention" onClick={() => setEdit(i)}>✏️</button>
                   </div>
                 </div>
