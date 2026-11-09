@@ -8,17 +8,23 @@ type Slot = { start: string; tech: string; tech_name: string; detour: number; be
 const localInput = (iso?: string | null) => { if (!iso) return ""; const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
 
 // Bloc « Rendez-vous et planning » : créneaux disponibles (trajets optimisés) + ajout / mise à jour au planning
-export default function PlanningBlock({ address, interventionId, onSchedule, children }: {
+export default function PlanningBlock({ address, interventionId, onSchedule, children, value, onChange }: {
   address: string;
   interventionId?: string | null;
   // Crée l'intervention liée (après enregistrement du document) et renvoie son id
   onSchedule: (when: string, tech: { assigned_to: string | null; technician: string | null }, duration: number) => Promise<string | null>;
   children?: React.ReactNode;
+  // Date et technicien choisis, gardés dans le document même sans ajout au planning
+  value?: { when?: string | null; tech?: string | null };
+  onChange?: (v: { when: string | null; tech: string | null }) => void;
 }) {
   const { team, company } = useCompany();
   const [iv, setIv] = useState<{ id: string; starts_at: string; status: string; assigned_to?: string | null } | null>(null);
-  const [when, setWhen] = useState<string | null>(null);
-  const [tech, setTech] = useState<string>("");
+  const [when, setWhenS] = useState<string | null>(value?.when || null);
+  const [tech, setTechS] = useState<string>(value?.tech || "");
+  const setWhen = (w: string | null) => { setWhenS(w); onChange?.({ when: w, tech: tech || null }); };
+  const setTech = (t: string) => { setTechS(t); onChange?.({ when, tech: t || null }); };
+  useEffect(() => { if (value?.when !== undefined) setWhenS(value.when || null); if (value?.tech !== undefined) setTechS(value.tech || ""); }, [value?.when, value?.tech]);
   const [slots, setSlots] = useState<Slot[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -28,7 +34,7 @@ export default function PlanningBlock({ address, interventionId, onSchedule, chi
   useEffect(() => {
     if (!interventionId) { setIv(null); return; }
     sb().from("interventions").select("id, starts_at, status, assigned_to").eq("id", interventionId).maybeSingle().then(({ data }) => {
-      if (data && ["planned", "to_confirm"].includes(data.status)) { setIv(data); setWhen(data.starts_at); setTech(data.assigned_to || ""); } else setIv(null);
+      if (data && ["planned", "to_confirm"].includes(data.status)) { setIv(data); setWhenS(data.starts_at); setTechS(data.assigned_to || ""); } else setIv(null);
     });
   }, [interventionId]);
 
@@ -86,7 +92,7 @@ export default function PlanningBlock({ address, interventionId, onSchedule, chi
                 <div className="mt-1 flex flex-wrap gap-2">
                   {list.map((x) => {
                     const on = when && new Date(when).getTime() === new Date(x.start).getTime() && tech === x.tech;
-                    return <button key={x.start + x.tech} type="button" onClick={() => { setWhen(x.start); setTech(x.tech); }}
+                    return <button key={x.start + x.tech} type="button" onClick={() => { setWhenS(x.start); setTechS(x.tech); onChange?.({ when: x.start, tech: x.tech }); }}
                       className={`rounded-xl border px-3 py-1.5 text-sm ${on ? "border-flame bg-flame text-white" : "border-slate-300 bg-white"}`}>
                       <b>{new Date(x.start).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</b>{x.best && " ⭐"}{team.length > 1 && <span className="block text-[10px] opacity-80">{x.tech_name}</span>}
                     </button>;

@@ -241,6 +241,8 @@ function Editor() {
 
         {editable && (
           <PlanningBlock address={r.address || [client?.address, client?.zip, client?.city].filter(Boolean).join(" ")} interventionId={r.intervention_id}
+            value={{ when: (r as any).planned_at || null, tech: (r as any).assigned_to || null }}
+            onChange={(v) => setR((cur) => cur && ({ ...cur, planned_at: v.when, assigned_to: v.tech } as any))}
             onSchedule={async (when, tech, duration) => {
               if (!r.client_id && !r.client_snapshot) { setErr("Choisissez d'abord le client."); return null; }
               const addr = r.address || [client?.address, client?.zip, client?.city].filter(Boolean).join(" ") || null;
@@ -248,7 +250,7 @@ function Editor() {
                 client_id: r.client_id || null, address: addr, starts_at: when, duration_min: duration, ...tech, notes: r.works || null, status: "planned" }).select("id").single();
               if (error) { setErr(error.message); return null; }
               // Le quitus est enregistré avec le lien vers ce rendez-vous
-              const saved = await save({ intervention_id: data.id, address: addr || r.address } as any);
+              const saved = await save({ intervention_id: data.id, address: addr || r.address, planned_at: when, assigned_to: tech.assigned_to } as any);
               if (!saved) { await sb().from("interventions").delete().eq("id", data.id); return null; }
               return data.id;
             }}>
