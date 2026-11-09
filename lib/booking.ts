@@ -6,7 +6,7 @@ export type Busy = { id: string; assigned_to: string | null; starts_at: string; 
 export type Ctx = {
   active: boolean;
   company: { name: string; phone?: string; email?: string; logo_url?: string; address?: string; zip?: string; city?: string; sms_enabled?: boolean; sms_sender?: string;
-    duration: number; day_start: string; day_end: string; buffer: number; max_km: number; days_ahead: number; saturday: boolean; auto_confirm: boolean; keep_free: number };
+    duration: number; day_start: string; day_end: string; buffer: number; max_km: number; days_ahead: number; saturday: boolean; auto_confirm: boolean; keep_free: number; lunch?: boolean; lunch_start?: string; lunch_end?: string };
   ticket: { id: string; kind?: string; number: string; problem?: string; status: string; address: string; client_name?: string; client_email?: string; client_phone?: string };
   booked: { id: string; starts_at: string; duration_min: number; status: string } | null;
   techs: { id: string; name?: string; role: string }[];
@@ -97,14 +97,25 @@ export async function computeSlots(ctx: Ctx, client: Pt, depot: Pt | null, now =
         .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
       const used = list.reduce((s, b) => s + (b.duration_min || 60), 0);
       if (used + dur > (dayEnd - dayStart) / 60000 - (co.keep_free || 0)) continue;
-      const nodes = [{ end: dayStart, start: dayStart, node: depotIdx, depot: true },
+      type N = { start: number; end: number; node: number; depot: boolean; lunch?: boolean };
+      const nodes: N[] = [{ end: dayStart, start: dayStart, node: depotIdx, depot: true },
         ...list.map((b) => ({ start: new Date(b.starts_at).getTime(), end: new Date(b.starts_at).getTime() + (b.duration_min || 60) * 60000, node: nodeOf(b), depot: false })),
         { start: dayEnd, end: dayEnd, node: depotIdx, depot: true }];
+      // Pause déjeuner : bloque le créneau, le technicien reste là où il était
+      if (co.lunch !== false && co.lunch_start && co.lunch_end) {
+        const l0 = hm(co.lunch_start), l1 = hm(co.lunch_end);
+        const ls = parisDate(ymd.y, ymd.m, ymd.d, l0.h, l0.m).getTime(), le = parisDate(ymd.y, ymd.m, ymd.d, l1.h, l1.m).getTime();
+        if (le > ls && !nodes.some((n) => !n.depot && n.start < le && n.end > ls)) {
+          const at = nodes.findIndex((n, i) => i > 0 && n.start >= le);
+          const prev = nodes[at - 1];
+          nodes.splice(at, 0, { start: ls, end: le, node: prev.node, depot: prev.depot, lunch: true });
+        }
+      }
       for (let k = 0; k < nodes.length - 1; k++) {
         const A = nodes[k], B = nodes[k + 1];
         const tAC = tt(A.node, 0), tCB = tt(0, B.node), tAB = A.depot && B.depot ? 0 : tt(A.node, B.node);
-        let earliest = A.depot ? dayStart : A.end + (buf + tAC) * 60000;
-        const latest = (B.depot ? dayEnd : B.start - (buf + tCB) * 60000) - dur * 60000;
+        let earliest = A.lunch ? A.end + tAC * 60000 : A.depot ? dayStart : A.end + (buf + tAC) * 60000;
+        const latest = (B.lunch ? B.start - tCB * 60000 : B.depot ? dayEnd : B.start - (buf + tCB) * 60000) - dur * 60000;
         earliest = Math.max(earliest, minStart);
         const grid = 30 * 60000;
         earliest = Math.ceil(earliest / grid) * grid;

@@ -181,6 +181,10 @@ function Settings() {
             {F({ k: "booking_duration_min", label: "Durée d'un SAV (min)", type: "number" })}{F({ k: "booking_buffer_min", label: "Marge entre RDV (min)", type: "number" })}
             {F({ k: "booking_max_km", label: "Zone maxi (km)", type: "number" })}{F({ k: "booking_days_ahead", label: "Réservable sur (jours)", type: "number" })}
           </div>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={c.booking_lunch ?? true} onChange={(e) => setC({ ...c, booking_lunch: e.target.checked })} /> Pause déjeuner (aucun RDV pendant ce créneau)</label>
+          {(c.booking_lunch ?? true) && <div className="grid grid-cols-2 gap-2">
+            {F({ k: "booking_lunch_start", label: "Début de la pause", type: "time" })}{F({ k: "booking_lunch_end", label: "Fin de la pause", type: "time" })}
+          </div>}
           {F({ k: "booking_keep_free", label: "Temps gardé libre pour les urgences (min par jour et par technicien)", type: "number" })}
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!c.booking_saturday} onChange={(e) => setC({ ...c, booking_saturday: e.target.checked })} /> Proposer le samedi</label>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!c.booking_auto_confirm} onChange={(e) => setC({ ...c, booking_auto_confirm: e.target.checked })} /> Confirmer automatiquement (sinon : « à confirmer » dans le planning)</label>

@@ -12,7 +12,7 @@ export type Line = {
 export type Company = {
   id: string; name: string; legal_form?: string; siret?: string; vat_number?: string;
   booking_enabled?: boolean; booking_duration_min?: number; booking_day_start?: string; booking_day_end?: string; booking_buffer_min?: number;
-  booking_max_km?: number; booking_days_ahead?: number; booking_saturday?: boolean; booking_auto_confirm?: boolean; booking_keep_free?: number;
+  booking_max_km?: number; booking_days_ahead?: number; booking_saturday?: boolean; booking_auto_confirm?: boolean; booking_keep_free?: number; booking_lunch?: boolean; booking_lunch_start?: string; booking_lunch_end?: string;
   vat_exempt?: boolean; rcs?: string; capital?: string; address?: string; zip?: string;
   city?: string; phone?: string; email?: string; iban?: string; bic?: string;
   insurance?: string; logo_url?: string; payment_terms_days?: number;

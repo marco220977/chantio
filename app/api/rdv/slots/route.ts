@@ -38,7 +38,8 @@ export async function POST(req: Request) {
   const ctx: Ctx = {
     active: true,
     company: { name: co.name, duration: Number(duration) || co.booking_duration_min || 90, day_start: co.booking_day_start || "08:00", day_end: co.booking_day_end || "17:00",
-      buffer: co.booking_buffer_min ?? 15, max_km: co.booking_max_km || 40, days_ahead: days, saturday: !!co.booking_saturday, auto_confirm: true, keep_free: 0 },
+      buffer: co.booking_buffer_min ?? 15, max_km: co.booking_max_km || 40, days_ahead: days, saturday: !!co.booking_saturday, auto_confirm: true, keep_free: 0,
+      lunch: co.booking_lunch !== false, lunch_start: co.booking_lunch_start || "12:00", lunch_end: co.booking_lunch_end || "13:00" },
     ticket: { id: sav_id || "", number: "", status: "open", address: String(address) },
     booked: null, techs, busy: list as any,
   };
