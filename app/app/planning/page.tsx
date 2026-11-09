@@ -8,6 +8,7 @@ import Modal from "@/components/Modal";
 import type { Client } from "@/lib/types";
 import { memberName, useCompany } from "@/components/CompanyContext";
 import { estimateMin, geocode, type Pt } from "@/lib/booking";
+import { dayHours, elapsed, fmtH, laborMinutes, splitDays } from "@/lib/workload";
 
 type Iv = { id?: string; assigned_to?: string | null; title: string; client_id?: string | null; document_id?: string | null; address?: string; starts_at: string; duration_min: number; technician?: string; status: string; notes?: string; clients?: { name: string; phone?: string } | null;
   sav_id?: string | null; lat?: number | null; lng?: number | null; booked_by_client?: boolean; billable?: boolean; price_ht?: number | null; vat_rate?: number; invoice_id?: string | null; _kind?: "intervention" | "sav" };
@@ -22,6 +23,10 @@ function Planning() {
   const [week, setWeek] = useState(startOfWeek(new Date()));
   const [list, setList] = useState<Iv[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [quotes, setQuotes] = useState<any[]>([]); // devis du client choisi
+  const [work, setWork] = useState(0); // minutes de main d'œuvre prévues au devis
+  const [slots, setSlots] = useState<{ start: string; tech: string; tech_name: string; best: boolean }[] | null>(null);
+  const [slotsBusy, setSlotsBusy] = useState(false);
   const [nc, setNc] = useState<Partial<Client> | null>(null); // nouveau client saisi depuis le planning
   const [ncErr, setNcErr] = useState("");
   const [edit, setEdit] = useState<Iv | null>(null);
@@ -53,6 +58,38 @@ function Planning() {
     });
   }, [params]);
 
+  // Devis du client (pour reprendre le temps prévu)
+  useEffect(() => {
+    if (!edit || edit.id || edit._kind === "sav" || !edit.client_id) { setQuotes([]); return; }
+    sb().from("documents").select("id, number, title, status, lines").eq("kind", "quote").eq("client_id", edit.client_id).neq("status", "draft").order("created_at", { ascending: false }).limit(30)
+      .then(({ data }) => {
+        setQuotes(data || []);
+        if (edit.document_id) { const q = (data || []).find((x) => x.id === edit.document_id); if (q) pickQuote(q, true); }
+      });
+  }, [edit?.client_id, edit?.id, edit?._kind]);
+  useEffect(() => { if (!edit) { setWork(0); setSlots(null); } }, [edit]);
+
+  function pickQuote(q: any, keepTitle = false) {
+    const w = laborMinutes(q?.lines || []);
+    setWork(w); setSlots(null);
+    setEdit((e) => e && ({ ...e, document_id: q?.id || null, title: keepTitle && e.title && e.title !== "Intervention" ? e.title : (q?.title || (q ? `Devis ${q.number}` : e.title)),
+      ...(w ? { duration_min: Math.min(elapsed(new Date(e.starts_at).getHours() * 60 + new Date(e.starts_at).getMinutes(), w, company), dayHours(company).end - dayHours(company).start) } : {}) }));
+  }
+
+  // Créneaux disponibles (trajets optimisés) pour la durée de l'intervention
+  async function findSlots() {
+    if (!edit?.address?.trim()) return alert("Indiquez d'abord l'adresse.");
+    setSlotsBusy(true); setSlots([]);
+    const { data: { session } } = await sb().auth.getSession();
+    const dur = Math.min(work || edit.duration_min, dayHours(company).work);
+    const r = await fetch("/api/rdv/slots", { method: "POST", headers: { "content-type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ address: edit.address, tech: edit.assigned_to || null, duration: dur }) });
+    const j = await r.json().catch(() => ({}));
+    setSlotsBusy(false);
+    if (!r.ok) { setSlots(null); return alert(j.error || "Recherche impossible"); }
+    setSlots(j.slots || []);
+  }
+
   async function save(over?: Partial<Iv>) {
     if (!edit) return;
     const { id, clients: _c, _kind, ...row } = { ...edit, ...over };
@@ -63,6 +100,17 @@ function Planning() {
     if (row.status !== "done" && row.status !== "canceled") {
       const warn = await overlapWarning({ ...row, id } as Iv);
       if (warn && !confirm(warn)) return;
+    }
+    // Chantier de plusieurs jours (temps du devis) : une intervention par journée
+    if (!id && work > dayHours(company).work && row.status === "planned") {
+      const parts = splitDays(row.starts_at, work, company);
+      if (parts.length > 1) {
+        if (!confirm(`Main d'œuvre prévue au devis : ${fmtH(work)}.\nL'intervention sera répartie sur ${parts.length} jours :\n${parts.map((p, i) => `• Jour ${i + 1} : ${new Date(p.starts_at).toLocaleString("fr-FR", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })} (${fmtH(p.work)})`).join("\n")}\n\nCréer ces ${parts.length} rendez-vous ?`)) return;
+        const rows = parts.map((p, i) => ({ ...row, starts_at: p.starts_at, duration_min: p.duration_min, title: `${row.title} (jour ${i + 1}/${parts.length})`, ...(i > 0 ? { billable: false, price_ht: null } : {}) }));
+        const { error } = await sb().from("interventions").insert(rows);
+        if (error) return alert(error.message);
+        setEdit(null); load(); return;
+      }
     }
     const wasDone = id ? list.find((x) => x.id === id)?.status === "done" : false;
     const { data: saved } = id ? await sb().from("interventions").update(row).eq("id", id).select().single() : await sb().from("interventions").insert(row).select().single();
@@ -247,11 +295,24 @@ function Planning() {
                 </div>
               </div>
             )}
+            {!edit.id && edit._kind !== "sav" && edit.client_id && quotes.length > 0 && (
+              <div><label className="label">Devis lié (reprend le temps prévu)</label>
+                <select className="input" value={edit.document_id || ""} onChange={(e) => pickQuote(quotes.find((q) => q.id === e.target.value) || null)}>
+                  <option value="">— Sans devis —</option>
+                  {quotes.map((q) => <option key={q.id} value={q.id}>{q.number}{q.title ? ` — ${q.title}` : ""}</option>)}
+                </select></div>
+            )}
+            {!edit.id && edit.document_id && (
+              <p className={`rounded-lg p-2 text-xs ${work ? "bg-blue-50 text-blue-900" : "bg-amber-50 text-amber-900"}`}>
+                {work ? <>⏱ Main d'œuvre prévue au devis : <b>{fmtH(work)}</b>{work > dayHours(company).work ? ` → ${splitDays(edit.starts_at, work, company).length} jours de travail (journée de ${fmtH(dayHours(company).work)}), créés automatiquement à l'enregistrement.` : "."}</>
+                  : "Aucune ligne en heures dans ce devis : choisissez la durée à la main."}
+              </p>
+            )}
             <input className="input" placeholder="Adresse" value={edit.address || ""} onChange={(e) => setEdit({ ...edit, address: e.target.value })} />
             <div className="grid grid-cols-2 gap-2">
               <input type="datetime-local" className="input" value={localInput(edit.starts_at)} onChange={(e) => setEdit({ ...edit, starts_at: new Date(e.target.value).toISOString() })} />
               <select className="input" value={edit.duration_min} onChange={(e) => setEdit({ ...edit, duration_min: Number(e.target.value) })}>
-                {[30, 60, 90, 120, 180, 240, 480].map((m) => <option key={m} value={m}>{m < 60 ? `${m} min` : `${m / 60} h`}</option>)}
+                {Array.from(new Set([30, 60, 90, 120, 180, 240, 300, 360, 420, 480, 540, edit.duration_min])).sort((a, b) => a - b).map((m) => <option key={m} value={m}>{m < 60 ? `${m} min` : fmtH(m)}</option>)}
               </select>
             </div>
             <div><label className="label">Attribué à</label>
@@ -259,6 +320,24 @@ function Planning() {
                 <option value="">— Non attribué —</option>
                 {team.map((m) => <option key={m.user_id} value={m.user_id}>{memberName(m)}{m.role === "technician" ? " (technicien)" : ""}</option>)}
               </select></div>
+            {!edit.id && <button type="button" className="btn-ghost w-full" disabled={slotsBusy} onClick={findSlots}>{slotsBusy ? "Recherche des créneaux…" : "🔎 Voir les créneaux disponibles"}</button>}
+            {slots && !slotsBusy && (
+              <div className="space-y-2 rounded-xl bg-slate-50 p-3">
+                {!slots.length ? <p className="text-sm text-slate-500">Aucun créneau libre sur la période.</p> : <>
+                  <p className="text-xs text-slate-500">Classés pour limiter les trajets. ⭐ = déjà dans le secteur. {work > dayHours(company).work ? "Choisissez le premier jour, les suivants sont ajoutés à la suite." : ""}</p>
+                  {Object.entries(slots.reduce((g: Record<string, typeof slots>, x) => { const k = new Date(x.start).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }); (g[k] ||= []).push(x); return g; }, {})).map(([day, l]) => (
+                    <div key={day}><p className="text-sm font-semibold capitalize">{day}</p>
+                      <div className="mt-1 flex flex-wrap gap-2">{l.map((x) => {
+                        const on = new Date(edit.starts_at).getTime() === new Date(x.start).getTime() && edit.assigned_to === x.tech;
+                        return <button key={x.start + x.tech} type="button" className={`rounded-xl border px-3 py-1.5 text-sm ${on ? "border-flame bg-flame text-white" : "border-slate-300 bg-white"}`}
+                          onClick={() => setEdit({ ...edit, starts_at: x.start, assigned_to: x.tech, technician: x.tech_name, ...(work ? { duration_min: Math.min(elapsed(new Date(x.start).getHours() * 60 + new Date(x.start).getMinutes(), work, company), dayHours(company).end - (new Date(x.start).getHours() * 60 + new Date(x.start).getMinutes())) } : {}) })}>
+                          <b>{new Date(x.start).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</b>{x.best && " ⭐"}{team.length > 1 && <span className="block text-[10px] opacity-80">{x.tech_name}</span>}
+                        </button>; })}</div>
+                    </div>
+                  ))}
+                </>}
+              </div>
+            )}
             <textarea className="input" rows={2} placeholder={edit._kind === "sav" ? "Problème signalé par le client" : "Notes"} value={edit.notes || ""} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} />
             {!edit.sav_id && (
               <div className="rounded-xl border border-slate-200 p-3 space-y-2">
