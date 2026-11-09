@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import GiftLinks from "@/components/GiftLinks";
+import ServiceStatus from "@/components/ServiceStatus";
 import { useEffect, useMemo, useState } from "react";
 import { sb } from "@/lib/supabase";
 import Header from "@/components/Header";
@@ -81,6 +82,8 @@ export default function Admin() {
             {k.endingSoon.map((c) => <p key={c.id} className="text-sm">{c.name} — {d(c.trial_ends_at)}{c.email && <> · <a className="text-brand" href={`mailto:${c.email}`}>{c.email}</a></>}</p>)}
           </section>
         )}
+
+        <ServiceStatus />
 
         <GiftLinks />
 
