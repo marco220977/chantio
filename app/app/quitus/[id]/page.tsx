@@ -216,9 +216,21 @@ function Editor() {
           <div><label className="label">Lieu des travaux</label><input className="input" disabled={!editable} value={r.address || ""} onChange={(e) => set({ address: e.target.value })} /></div>
           <div><label className="label">Nature des travaux</label><textarea className="input text-sm" rows={4} disabled={!editable} value={r.works || ""} onChange={(e) => set({ works: e.target.value })} placeholder="Ex : Remplacement chaudière gaz par PAC air/eau 8 kW" /></div>
           <div className="grid grid-cols-2 gap-2">
-            <div><label className="label">Fin des travaux</label><input type="date" className="input" disabled={!editable} value={r.works_end_date || ""} onChange={(e) => set({ works_end_date: e.target.value })} /></div>
-            <div><label className="label">Réception</label><input type="date" className="input" disabled={!editable} value={r.reception_date || ""} onChange={(e) => set({ reception_date: e.target.value })} /></div>
+            {([["works_end_date", "Fin des travaux"], ["reception_date", "Réception"]] as const).map(([k, l]) => {
+              const on = !!(r as any)[k];
+              return (
+                <div key={k}>
+                  <label className="label flex items-center gap-1.5">
+                    {editable && <input type="checkbox" checked={on} onChange={(e) => set({ [k]: e.target.checked ? new Date().toISOString().slice(0, 10) : null } as any)} />}
+                    {l}
+                  </label>
+                  {on ? <input type="date" className="input" disabled={!editable} value={(r as any)[k] || ""} onChange={(e) => set({ [k]: e.target.value || null } as any)} />
+                    : <p className="input !bg-slate-50 text-sm text-slate-400">Non indiquée</p>}
+                </div>
+              );
+            })}
           </div>
+          {editable && !r.reception_date && <p className="text-xs text-slate-500">Sans date de réception, c'est la date de signature du procès-verbal qui fait courir les garanties (parfait achèvement, biennale, décennale).</p>}
           {(r.chantier_id || r.document_id) && (
             <div className="flex gap-3 text-sm">
               {r.chantier_id && <Link className="text-brand" href={`/app/chantiers/${r.chantier_id}`}>🏗️ Chantier</Link>}

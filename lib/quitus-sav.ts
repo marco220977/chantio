@@ -78,7 +78,7 @@ async function photosBlock(pdf: jsPDF, y: number, paths: string[], urls: Record<
 export async function buildReceptionPdf(r: Reception, company: Company, photoUrls: Record<string, string> = {}) {
   const pdf = new jsPDF({ unit: "mm", format: "a4" });
   const M = 15;
-  let y = await header(pdf, company, "PROCÈS-VERBAL DE RÉCEPTION DES TRAVAUX", r.number || "", [`Date de réception : ${dateFr(r.reception_date)}`]);
+  let y = await header(pdf, company, "PROCÈS-VERBAL DE RÉCEPTION DES TRAVAUX", r.number || "", r.reception_date ? [`Date de réception : ${dateFr(r.reception_date)}`] : []);
   const h1 = box(pdf, M, y, 88, "Maître d'ouvrage (client)", clientLines(r.client_snapshot));
   const h2 = box(pdf, 107, y, 88, "Entreprise", [company.name, [company.address, company.zip, company.city].filter(Boolean).join(" "), company.siret ? `SIRET ${company.siret}` : "", company.insurance ? `Assurance : ${company.insurance}` : ""].filter(Boolean) as string[]);
   y += Math.max(h1, h2) + 6;
@@ -87,7 +87,7 @@ export async function buildReceptionPdf(r: Reception, company: Company, photoUrl
   if (r.works_end_date) y = paragraph(pdf, y, "Date d'achèvement des travaux", dateFr(r.works_end_date));
 
   y = paragraph(pdf, y, "Décision du maître d'ouvrage",
-    `Après visite des travaux effectuée contradictoirement le ${dateFr(r.reception_date)}, le maître d'ouvrage déclare que la réception est prononcée ` +
+    `Après visite des travaux effectuée contradictoirement${r.reception_date ? ` le ${dateFr(r.reception_date)}` : ""}, le maître d'ouvrage déclare que la réception est prononcée ` +
     (r.with_reserves && r.reserves.length ? "AVEC les réserves mentionnées ci-dessous." : "SANS réserve."));
 
   if (r.with_reserves && r.reserves.length) {
@@ -102,12 +102,14 @@ export async function buildReceptionPdf(r: Reception, company: Company, photoUrl
     if (r.reserves_lifted_at) y = paragraph(pdf, y, "Levée des réserves", `L'ensemble des réserves a été levé le ${dateFr(r.reserves_lifted_at)}.`);
   }
 
-  const d = r.reception_date || new Date().toISOString().slice(0, 10);
+  // Sans date de réception indiquée : on se base sur la date de signature, sinon durées sans date
+  const d = r.reception_date || (r.signed_at ? r.signed_at.slice(0, 10) : "");
+  const until = (n: number, label: string) => d ? `jusqu'au ${dateFr(addYears(d, n))}` : label;
   y = paragraph(pdf, y, "Effets de la réception",
-    `La réception constitue le point de départ des garanties légales (articles 1792 et suivants du Code civil) :\n` +
-    `• garantie de parfait achèvement : jusqu'au ${dateFr(addYears(d, 1))} ;\n` +
-    `• garantie de bon fonctionnement des éléments d'équipement dissociables (biennale) : jusqu'au ${dateFr(addYears(d, 2))} ;\n` +
-    `• garantie décennale : jusqu'au ${dateFr(addYears(d, 10))}.\n` +
+    `La réception constitue le point de départ des garanties légales (articles 1792 et suivants du Code civil)${!r.reception_date && d ? ", la date de réception étant celle de la signature du présent procès-verbal" : ""} :\n` +
+    `• garantie de parfait achèvement : ${until(1, "1 an à compter de la réception")} ;\n` +
+    `• garantie de bon fonctionnement des éléments d'équipement dissociables (biennale) : ${until(2, "2 ans à compter de la réception")} ;\n` +
+    `• garantie décennale : ${until(10, "10 ans à compter de la réception")}.\n` +
     `Les désordres apparents non signalés au présent procès-verbal sont réputés acceptés.`);
   if (r.notes) y = paragraph(pdf, y, "Observations", r.notes);
   y = await photosBlock(pdf, y, r.photos || [], photoUrls);
