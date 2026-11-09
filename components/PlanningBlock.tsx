@@ -40,8 +40,9 @@ export default function PlanningBlock({ address, interventionId, onSchedule, chi
       body: JSON.stringify({ address, tech: tech || null, duration }) });
     const j = await r.json().catch(() => ({}));
     setBusy(false);
-    if (!r.ok) { setSlots(null); return setErr(j.error || "Recherche impossible"); }
+    if (!r.ok) { setSlots(null); return setErr(j.error || `Recherche impossible (erreur ${r.status})`); }
     setSlots(j.slots || []);
+    setTimeout(() => document.getElementById("pb-slots")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
   }
 
   async function plan() {
@@ -76,9 +77,9 @@ export default function PlanningBlock({ address, interventionId, onSchedule, chi
       </div>
       <button type="button" className="btn-ghost w-full" disabled={busy} onClick={findSlots}>{busy && slots ? "Recherche des créneaux…" : "🔎 Voir les créneaux disponibles"}</button>
       {slots && !busy && (
-        <div className="space-y-2 rounded-xl bg-slate-50 p-3">
+        <div id="pb-slots" className="space-y-2 rounded-xl bg-slate-50 p-3">
           {!slots.length ? <p className="text-sm text-slate-500">Aucun créneau libre sur la période : choisissez une date à la main.</p> : <>
-            <p className="text-xs text-slate-500">Créneaux libres, classés pour limiter les trajets. ⭐ = un technicien est déjà dans le secteur ce jour-là. Touchez un créneau pour le choisir.</p>
+            <p className="text-xs text-slate-500">Créneaux libres, classés pour limiter les trajets. ⭐ = un technicien est déjà dans le secteur ce jour-là. Touchez un créneau pour le choisir, puis « Ajouter au planning ».{tech ? " (Seulement pour le technicien choisi.)" : ""}</p>
             {Object.entries(groups).map(([day, list]) => (
               <div key={day}>
                 <p className="text-sm font-semibold capitalize">{day}</p>

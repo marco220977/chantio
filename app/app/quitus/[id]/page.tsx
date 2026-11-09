@@ -253,7 +253,12 @@ function Editor() {
               return data.id;
             }}>
             {r.id ? <RdvLink ticket={r} table="receptions" companyName={company?.name || ""} onToken={(tk) => setR({ ...r, booking_token: tk } as any)} />
-              : <button type="button" className="btn-ghost w-full" onClick={async () => { if (!r.client_id && !r.client_snapshot) return setErr("Choisissez d'abord le client."); const sv = await save(); if (sv) flash("Quitus enregistré : appuyez à nouveau pour créer le lien client."); }}>📲 Laisser le client choisir son RDV en ligne</button>}
+              : <button type="button" className="btn-ghost w-full" disabled={busy} onClick={async () => {
+                  if (!r.client_id && !r.client_snapshot) return setErr("Choisissez d'abord le client.");
+                  // Enregistre le quitus avec son lien de RDV en une seule fois
+                  const sv = await save({ booking_token: crypto.randomUUID() } as any);
+                  if (sv) flash("📲 Lien de RDV créé : envoyez-le au client ci-dessous.");
+                }}>📲 Laisser le client choisir son RDV en ligne</button>}
           </PlanningBlock>
         )}
 
