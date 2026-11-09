@@ -32,12 +32,13 @@ Extrais CHAQUE article lisible avec son prix. N'invente rien : si une informatio
 - "ref" : référence fabricant ou fournisseur exactement comme écrite.
 - "brand" : marque si visible.
 - "unit" : u, m, ml, m², kg, l, lot, rouleau, boîte... (u par défaut).
-- "price" : prix unitaire HT en euros (nombre). Si seul un prix TTC est indiqué, convertis en HT (TTC / 1,2) et mets "price_type":"ttc_converti".
-- "price_type" : "achat" (prix net / remisé / facture / ticket), "public" (prix public, tarif catalogue avant remise), "ttc_converti", ou "inconnu".
+- "cost" : prix d'ACHAT unitaire HT en euros (prix net, remisé, de facture ou de ticket), null si absent.
+- "public" : prix PUBLIC unitaire HT en euros (tarif catalogue avant remise), null si absent.
+- Un prix « HT » de catalogue sans autre indication est un prix public. Si seul un prix TTC est indiqué, convertis en HT (TTC / 1,2).
 - "category" : une parmi Chauffage, Sanitaire, Plomberie, Raccords, Évacuation, Robinetterie, Électricité, Outillage, Fournitures.
 - Un même article décliné en plusieurs tailles = une ligne par taille (avec sa référence et son prix).
 Réponds UNIQUEMENT avec un JSON, sans texte autour :
-{"supplier":"nom du fournisseur ou du catalogue si visible","items":[{"label":"","ref":"","brand":"","unit":"u","price":0,"price_type":"achat","category":"Plomberie"}],"notes":"remarque utile (pages floues, prix manquants…)"}`;
+{"supplier":"nom du fournisseur ou du catalogue si visible","items":[{"label":"","ref":"","brand":"","unit":"u","cost":null,"public":0,"category":"Plomberie"}],"notes":"remarque utile (pages floues, prix manquants, consigne appliquée…)"}`;
 
 function extractJson(txt: string): any | null {
   const t = txt.replace(/```(?:json)?/g, "");
@@ -62,7 +63,7 @@ Deno.serve(async (req) => {
   if (!(await subscriptionOk(req))) return json({ error: "L'intelligence artificielle (devis IA, scan de plaque, diagnostic, catalogue par photo) est incluse dans les formules Pro et Équipe : Menu → Abonnement." }, 402);
   const key = Deno.env.get("ANTHROPIC_API_KEY");
   if (!key) return json({ error: "Clé ANTHROPIC_API_KEY manquante" }, 500);
-  const { images } = await req.json().catch(() => ({}));
+  const { images, hint } = await req.json().catch(() => ({}));
   const list = (Array.isArray(images) ? images : []).slice(0, 4);
   const content: any[] = [];
   for (const im of list) {
@@ -70,7 +71,8 @@ Deno.serve(async (req) => {
     if (m) content.push({ type: "image", source: { type: "base64", media_type: m[1], data: m[2] } });
   }
   if (!content.length) return json({ error: "Ajoutez au moins une photo." }, 400);
-  content.push({ type: "text", text: PROMPT });
+  const h = String(hint || "").trim().slice(0, 1500);
+  content.push({ type: "text", text: PROMPT + (h ? `\n\nCONSIGNES DE L'ARTISAN POUR CE CATALOGUE (prioritaires sur les règles ci-dessus, applique-les à chaque ligne) :\n"""${h}"""` : "") });
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },

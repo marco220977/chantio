@@ -4,11 +4,18 @@ import { sb } from "@/lib/supabase";
 import { compressPhoto } from "@/lib/chantiers";
 import { VAT_RATES } from "@/lib/calc";
 import type { CatalogItem } from "@/lib/types";
+import { useCompany } from "@/components/CompanyContext";
 
-type Row = { keep: boolean; label: string; ref?: string; brand?: string; unit: string; price: number | null; price_type?: string; category: string; match?: CatalogItem };
+type Row = { keep: boolean; label: string; ref?: string; brand?: string; unit: string; cost: number | null; pub: number | null; category: string; match?: CatalogItem };
 const toUrl = (b: Blob) => new Promise<string>((ok) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.readAsDataURL(b); });
 const num = (v: any) => { const n = Number(String(v ?? "").replace(",", ".")); return isFinite(n) ? n : 0; };
 const round2 = (n: number) => Math.round(n * 100) / 100;
+const PRESETS: [string, string][] = [
+  ["Prix d'achat codé en centimes", "La colonne « RéfPro » contient mon prix d'achat HT écrit en centimes, sans virgule (exemple : 50389 = 503,89 €). La colonne « Prix HT » est le prix public. Garde comme référence la colonne « Réf. Four. »."],
+  ["Prix affichés = prix publics", "Tous les prix de la page sont des prix publics HT : ne remplis pas le prix d'achat."],
+  ["Prix affichés = prix nets", "Tous les prix de la page sont mes prix nets d'achat HT."],
+  ["Colonne remise", "La colonne « Remise » est mon pourcentage de remise sur le prix public : calcule le prix d'achat = prix public × (1 − remise)."],
+];
 
 // Ajout d'articles au catalogue depuis des photos (catalogue papier, tarif, ticket, facture) lues par l'IA
 export default function CatalogPhotoImport({ items, onDone, onClose }: { items: CatalogItem[]; onDone: (msg: string) => void; onClose: () => void }) {
@@ -21,6 +28,9 @@ export default function CatalogPhotoImport({ items, onDone, onClose }: { items: 
   const [vat, setVat] = useState(10);
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
+  const { company, reload } = useCompany();
+  const [hint, setHint] = useState<string>((company as any)?.catalog_ai_hint || "");
+  const [showHint, setShowHint] = useState<boolean>(!!(company as any)?.catalog_ai_hint);
 
   async function addFiles(files: FileList | null) {
     if (!files) return;
@@ -31,19 +41,23 @@ export default function CatalogPhotoImport({ items, onDone, onClose }: { items: 
 
   async function read() {
     setBusy("Lecture des photos par l'IA… (30 à 60 s)"); setErr("");
-    const { data, error } = await sb().functions.invoke("catalogue-photo", { body: { images: photos } });
+    // La consigne est mémorisée pour la prochaine fois
+    if ((hint || "") !== ((company as any)?.catalog_ai_hint || "")) { await sb().from("companies").update({ catalog_ai_hint: hint.trim() || null }).eq("id", company!.id); reload(); }
+    const { data, error } = await sb().functions.invoke("catalogue-photo", { body: { images: photos, hint } });
     setBusy("");
     let msg = data?.error;
     if (error) { msg = error.message; try { const j = await (error as any).context?.json?.(); if (j?.error) msg = j.error; } catch {} }
     if (msg) return setErr(msg);
     const byRef = new Map(items.filter((i) => i.ref).map((i) => [String(i.ref).trim().toUpperCase(), i]));
     setSupplier(data.supplier || ""); setNotes(data.notes || "");
-    setRows((data.items || []).map((x: any) => ({ keep: x.price != null, label: x.label || "", ref: x.ref || "", brand: x.brand || "", unit: x.unit || "u",
-      price: x.price == null ? null : num(x.price), price_type: x.price_type, category: x.category || "Fournitures",
+    const n = (v: any) => (v == null || v === "" ? null : num(v));
+    setRows((data.items || []).map((x: any) => ({ keep: x.cost != null || x.public != null, label: x.label || "", ref: x.ref || "", brand: x.brand || "", unit: x.unit || "u",
+      cost: n(x.cost), pub: n(x.public), category: x.category || "Fournitures",
       match: x.ref ? byRef.get(String(x.ref).trim().toUpperCase()) : undefined })));
   }
 
-  const cost = (r: Row) => r.price == null ? 0 : round2(r.price_type === "public" ? r.price * (1 - num(remise) / 100) : r.price);
+  // Prix d'achat : celui lu sur la page, sinon prix public moins la remise
+  const cost = (r: Row) => r.cost != null ? round2(r.cost) : r.pub != null ? round2(r.pub * (1 - num(remise) / 100)) : 0;
   const sale = (r: Row) => round2(cost(r) * (1 + num(margin) / 100));
   const setRow = (i: number, p: Partial<Row>) => setRows((rs) => rs && rs.map((x, j) => (j === i ? { ...x, ...p } : x)));
 
@@ -53,11 +67,11 @@ export default function CatalogPhotoImport({ items, onDone, onClose }: { items: 
     setBusy("Enregistrement…"); setErr("");
     let created = 0, updated = 0;
     const news = sel.filter((r) => !r.match).map((r) => ({ category: r.category, label: r.label.trim(), unit: r.unit || "u", unit_price: sale(r), cost_price: cost(r),
-      vat_rate: vat, ref: r.ref || null, brand: r.brand || null, public_price: r.price_type === "public" ? r.price : null,
+      vat_rate: vat, ref: r.ref || null, brand: r.brand || null, public_price: r.pub,
       description: supplier ? `Fournisseur : ${supplier}` : null }));
     if (news.length) { const { error } = await sb().from("catalog_items").insert(news); if (error) { setBusy(""); return setErr(error.message); } created = news.length; }
     for (const r of sel.filter((x) => x.match)) {
-      const { error } = await sb().from("catalog_items").update({ cost_price: cost(r), unit_price: sale(r), ...(r.price_type === "public" ? { public_price: r.price } : {}), updated_at: new Date().toISOString() }).eq("id", r.match!.id);
+      const { error } = await sb().from("catalog_items").update({ cost_price: cost(r), unit_price: sale(r), ...(r.pub != null ? { public_price: r.pub } : {}), updated_at: new Date().toISOString() }).eq("id", r.match!.id);
       if (!error) updated++;
     }
     setBusy("");
@@ -74,6 +88,14 @@ export default function CatalogPhotoImport({ items, onDone, onClose }: { items: 
         </div>
         {!!photos.length && <div className="grid grid-cols-4 gap-2">{photos.map((p, i) => (
           <div key={i} className="relative"><img src={p} alt="" className="h-20 w-full rounded-lg object-cover" /><button className="absolute right-0 top-0 rounded-full bg-white px-1.5 text-xs shadow" onClick={() => setPhotos(photos.filter((_, j) => j !== i))}>✕</button></div>))}</div>}
+        <div className="rounded-xl bg-slate-50 p-3">
+          <button type="button" className="text-sm font-semibold text-brand" onClick={() => setShowHint(!showHint)}>{showHint ? "▾" : "▸"} Consigne pour l'IA {hint ? "(mémorisée)" : "(facultatif)"}</button>
+          {showHint && <div className="mt-2 space-y-2">
+            <p className="text-xs text-slate-500">Expliquez comment lire votre catalogue : quelle colonne est votre prix d'achat, le prix public, la référence… La consigne est gardée pour les prochaines photos.</p>
+            <div className="flex flex-wrap gap-1">{PRESETS.map(([l, t]) => <button key={l} type="button" className="chip border border-slate-300 bg-white text-xs" onClick={() => setHint(t)}>{l}</button>)}</div>
+            <textarea className="input text-sm" rows={3} placeholder="Ex : la colonne RéfPro est mon prix d'achat en centimes (50389 = 503,89 €)…" value={hint} onChange={(e) => setHint(e.target.value)} />
+          </div>}
+        </div>
         <button className="btn-brand w-full" disabled={!photos.length || !!busy} onClick={read}>{busy || `✨ Lire ${photos.length || ""} photo${photos.length > 1 ? "s" : ""} avec l'IA`}</button>
       </>}
 
@@ -82,7 +104,7 @@ export default function CatalogPhotoImport({ items, onDone, onClose }: { items: 
         {notes && <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-900">{notes}</p>}
         <div className="grid grid-cols-3 gap-2 rounded-xl bg-slate-50 p-2">
           <label className="text-[11px] text-slate-500">Marge %<input className="input !px-2 text-sm" inputMode="decimal" value={margin} onChange={(e) => setMargin(e.target.value)} /></label>
-          <label className="text-[11px] text-slate-500">Remise sur prix public %<input className="input !px-2 text-sm" inputMode="decimal" value={remise} onChange={(e) => setRemise(e.target.value)} /></label>
+          <label className="text-[11px] text-slate-500">Remise si pas de prix d'achat %<input className="input !px-2 text-sm" inputMode="decimal" value={remise} onChange={(e) => setRemise(e.target.value)} /></label>
           <label className="text-[11px] text-slate-500">TVA<select className="input !px-1 text-sm" value={vat} onChange={(e) => setVat(Number(e.target.value))}>{VAT_RATES.map((v) => <option key={v} value={v}>{String(v).replace(".", ",")} %</option>)}</select></label>
         </div>
         <div className="max-h-[50vh] space-y-2 overflow-y-auto">
@@ -92,13 +114,14 @@ export default function CatalogPhotoImport({ items, onDone, onClose }: { items: 
                 <input type="checkbox" className="mt-2" checked={r.keep} onChange={(e) => setRow(i, { keep: e.target.checked })} />
                 <textarea className="input flex-1 !py-1 text-sm" rows={2} value={r.label} onChange={(e) => setRow(i, { label: e.target.value })} />
               </div>
-              <div className="grid grid-cols-3 gap-1 pl-6">
-                <input className="input !px-2 !py-1 text-xs" placeholder="Réf." value={r.ref || ""} onChange={(e) => setRow(i, { ref: e.target.value })} />
-                <input className="input !px-2 !py-1 text-xs" placeholder="Unité" value={r.unit} onChange={(e) => setRow(i, { unit: e.target.value })} />
-                <input className="input !px-2 !py-1 text-xs" inputMode="decimal" placeholder="Prix HT" value={r.price ?? ""} onChange={(e) => setRow(i, { price: e.target.value === "" ? null : num(e.target.value), keep: e.target.value !== "" || r.keep })} />
+              <div className="grid grid-cols-4 gap-1 pl-6">
+                <label className="text-[10px] text-slate-500">Réf.<input className="input !px-2 !py-1 text-xs" value={r.ref || ""} onChange={(e) => setRow(i, { ref: e.target.value })} /></label>
+                <label className="text-[10px] text-slate-500">Unité<input className="input !px-2 !py-1 text-xs" value={r.unit} onChange={(e) => setRow(i, { unit: e.target.value })} /></label>
+                <label className="text-[10px] text-slate-500">Achat HT<input className="input !px-2 !py-1 text-xs" inputMode="decimal" value={r.cost ?? ""} onChange={(e) => setRow(i, { cost: e.target.value === "" ? null : num(e.target.value) })} /></label>
+                <label className="text-[10px] text-slate-500">Public HT<input className="input !px-2 !py-1 text-xs" inputMode="decimal" value={r.pub ?? ""} onChange={(e) => setRow(i, { pub: e.target.value === "" ? null : num(e.target.value) })} /></label>
               </div>
               <p className="pl-6 text-[11px] text-slate-500">
-                {r.brand ? `${r.brand} · ` : ""}{r.category} · {r.price == null ? "⚠️ prix illisible" : <>{r.price_type === "public" ? "prix public" : r.price_type === "ttc_converti" ? "TTC converti en HT" : "prix d'achat"} → achat {cost(r).toFixed(2).replace(".", ",")} € · <b>vente {sale(r).toFixed(2).replace(".", ",")} € HT</b></>}
+                {r.brand ? `${r.brand} · ` : ""}{r.category} · {r.cost == null && r.pub == null ? "⚠️ prix illisible" : <>achat {cost(r).toFixed(2).replace(".", ",")} €{r.cost == null ? ` (public − ${num(remise)} %)` : ""}{r.pub != null && r.cost != null && r.pub > 0 ? ` · remise ${Math.round((1 - r.cost / r.pub) * 1000) / 10} %` : ""} · <b>vente {sale(r).toFixed(2).replace(".", ",")} € HT</b></>}
                 {r.match && <span className="ml-1 text-blue-700">· déjà au catalogue : prix mis à jour</span>}
               </p>
             </div>
