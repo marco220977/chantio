@@ -512,7 +512,7 @@ function Editor() {
           {margin && (
             <button type="button" className="ml-auto block text-right text-xs text-slate-400"
               onClick={() => { setShowMargin(true); setTimeout(() => setShowMargin(false), 5000); }}>
-              {showMargin ? `Marge : ${eur(margin.value)} (${margin.pct.toFixed(0)} %)` : "•••"}
+              {showMargin ? `Marge : ${eur(margin.value)} (${margin.pct.toFixed(0)} %) · achats ${eur(margin.cost)}` : "👁 Voir ma marge"}
             </button>
           )}
           <div><label className="label mt-2">Notes / conditions</label><textarea className="input text-sm" rows={2} disabled={!editable} value={doc.notes || ""} onChange={(e) => set({ notes: e.target.value })} /></div>

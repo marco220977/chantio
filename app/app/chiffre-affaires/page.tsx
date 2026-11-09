@@ -79,6 +79,20 @@ export default function CA() {
   const yearly = years.map((y) => ({ name: String(y), current: y === new Date().getFullYear(), value: usable.filter((r) => dateOf(r)?.startsWith(String(y))).reduce((s, r) => s + val(r), 0) }));
 
   const total = monthly.reduce((s, m) => s + m.value, 0);
+  // Marge brute = HT facturé − prix d'achat des lignes (main d'œuvre sans prix d'achat = marge)
+  const sign = (r: Row) => (r.kind === "credit" ? -1 : 1);
+  const costOf = (r: Row) => sign(r) * (r.lines || []).reduce((a, l: any) => a + (Number(l.cost_price) || 0) * (Number(l.qty) || 0), 0);
+  const hasCost = (r: Row) => (r.lines || []).some((l: any) => Number(l.cost_price) > 0);
+  const facturees = (rows || []).filter((r) => r.issue_date && Number(r.issue_date.slice(0, 4)) === year);
+  const htOf = (r: Row) => Number(r.total_ht);
+  const monthlyMargin = MONTHS.map((name, m) => {
+    const rs = facturees.filter((r) => Number(r.issue_date.slice(5, 7)) === m + 1);
+    const ht = rs.reduce((a, r) => a + htOf(r), 0), cost = rs.reduce((a, r) => a + costOf(r), 0);
+    return { name, current: year === new Date().getFullYear() && m === new Date().getMonth(), value: ht - cost, ht, cost };
+  });
+  const mHt = monthlyMargin.reduce((a, m) => a + m.ht, 0), mCost = monthlyMargin.reduce((a, m) => a + m.cost, 0);
+  const mVal = mHt - mCost, mPct = mHt ? (mVal / mHt) * 100 : 0;
+  const noCost = facturees.filter((r) => r.kind === "invoice" && !hasCost(r)).length;
   const prevSameDate = (() => {
     const now = new Date(); const lim = `${year - 1}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     return usable.filter((r) => { const d = dateOf(r); return d && d.startsWith(String(year - 1)) && (year !== now.getFullYear() || d.slice(0, 10) <= lim); }).reduce((s, r) => s + val(r), 0);
@@ -113,6 +127,19 @@ export default function CA() {
                   {evo >= 0 ? "▲" : "▼"} {Math.abs(evo).toFixed(0)} % vs {year - 1}{year === new Date().getFullYear() ? " à la même date" : ""}
                 </p>
               )}
+            </div>
+
+            <div className="card space-y-1">
+              <p className="text-xs font-semibold uppercase text-slate-500">Marge brute {year}</p>
+              <p className="text-3xl font-extrabold text-emerald-700">{eur(mVal)} <span className="text-lg">({mPct.toFixed(0)} %)</span></p>
+              <p className="text-sm text-slate-600">Facturé HT {eur(mHt)} − achats {eur(mCost)}</p>
+              <p className="text-xs text-slate-500">Achats = prix d'achat des articles de vos factures (catalogue). La main d'œuvre, sans prix d'achat, compte entièrement dans la marge.</p>
+              {noCost > 0 && <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-900">⚠️ {noCost} facture{noCost > 1 ? "s" : ""} sans aucun prix d'achat : leur marge est comptée à 100 %. Renseignez le prix d'achat des articles dans le catalogue (ou sur les lignes) pour une marge juste.</p>}
+            </div>
+
+            <div className="card">
+              <h2 className="mb-3 font-bold">Marge par mois — {year}</h2>
+              <Bars data={monthlyMargin} label="de marge brute" />
             </div>
 
             <div className="card">
@@ -152,10 +179,10 @@ export default function CA() {
             <div className="card overflow-x-auto">
               <h2 className="mb-2 font-bold">Détail {year}</h2>
               <table className="w-full text-sm">
-                <thead><tr className="text-left text-xs uppercase text-slate-500"><th className="py-1">Mois</th><th className="py-1 text-right">{unit}</th><th className="py-1 text-right">TVA</th></tr></thead>
+                <thead><tr className="text-left text-xs uppercase text-slate-500"><th className="py-1">Mois</th><th className="py-1 text-right">{unit}</th><th className="py-1 text-right">TVA</th><th className="py-1 text-right">Marge</th></tr></thead>
                 <tbody>
-                  {monthly.map((m, i) => <tr key={m.name} className="border-t border-slate-100"><td className="py-1.5">{m.name}</td><td className="py-1.5 text-right tabular-nums">{eur(m.value)}</td><td className="py-1.5 text-right tabular-nums text-slate-600">{eur(monthlyVat[i])}</td></tr>)}
-                  <tr className="border-t-2 font-bold"><td className="py-1.5">Total</td><td className="py-1.5 text-right tabular-nums">{eur(total)}</td><td className="py-1.5 text-right tabular-nums">{eur(totalVat)}</td></tr>
+                  {monthly.map((m, i) => <tr key={m.name} className="border-t border-slate-100"><td className="py-1.5">{m.name}</td><td className="py-1.5 text-right tabular-nums">{eur(m.value)}</td><td className="py-1.5 text-right tabular-nums text-slate-600">{eur(monthlyVat[i])}</td><td className="py-1.5 text-right tabular-nums text-emerald-700">{eur(monthlyMargin[i].value)}</td></tr>)}
+                  <tr className="border-t-2 font-bold"><td className="py-1.5">Total</td><td className="py-1.5 text-right tabular-nums">{eur(total)}</td><td className="py-1.5 text-right tabular-nums">{eur(totalVat)}</td><td className="py-1.5 text-right tabular-nums text-emerald-700">{eur(mVal)}</td></tr>
                 </tbody>
               </table>
             </div>
