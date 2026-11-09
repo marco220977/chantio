@@ -45,7 +45,11 @@ function Editor() {
       if (data?.intervention_id) { const { data: iv } = await s.from("interventions").select("billable, price_ht, invoice_id").eq("id", data.intervention_id).single();
         if (iv?.billable) setIvBill(iv.price_ht ? `${Number(iv.price_ht).toLocaleString("fr-FR", { style: "currency", currency: "EUR" })} HT` : "à compléter");
         if (iv?.invoice_id) setInvoiceId(iv.invoice_id); }
-      if (data?.document_id) { const { data: inv } = await s.from("documents").select("id").eq("source_quote_id", data.document_id).eq("kind", "invoice").neq("status", "canceled").order("created_at", { ascending: false }).limit(1); if (inv?.[0]) setInvoiceId(inv[0].id); }
+      if (data?.document_id) {
+        // Facture de fin de travaux : facture du devis ou situation finale (100 %) ; une situation partielle ne compte pas
+        const { data: inv } = await s.from("documents").select("id, situation_no, progress_pct").eq("source_quote_id", data.document_id).eq("kind", "invoice").neq("status", "canceled").order("created_at", { ascending: false }).limit(1);
+        if (inv?.[0] && (!inv[0].situation_no || Number(inv[0].progress_pct) >= 100)) setInvoiceId(inv[0].id);
+      }
     }); return; }
     (async () => {
       const user = await currentUser();
@@ -324,6 +328,9 @@ function Editor() {
         {editable && !r.document_id && !ivBill && <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-800">Aucun devis lié à ce quitus : la facture ne sera pas créée automatiquement après la signature.</p>}
         {editable && r.document_id && <p className="rounded-xl bg-green-50 p-3 text-xs text-green-800">Après signature sans réserve, la facture du devis (avec ses avenants signés) sera créée automatiquement en brouillon.</p>}
         {invoiceId && isSup && <Link href={`/app/doc/${invoiceId}`} className="btn-brand w-full">💶 Voir la facture créée</Link>}
+        {!invoiceId && isSup && r.status !== "draft" && (r.document_id || r.intervention_id) && (!r.with_reserves || r.reserves_lifted_at) && (
+          <button className="btn-brand w-full" disabled={busy} onClick={async () => { const inv = await makeInvoice(r); if (inv) router.push(`/app/doc/${inv}`); }}>💶 Créer la facture de fin de travaux</button>
+        )}
         {r.sent_at && <p className="text-xs text-green-700">📧 Envoyé le {new Date(r.sent_at).toLocaleString("fr-FR")} à {r.sent_to}</p>}
 
         <section className="space-y-2">
