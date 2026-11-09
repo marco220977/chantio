@@ -105,7 +105,8 @@ function Planning() {
     if (!id && work > dayHours(company).work && row.status === "planned") {
       const parts = splitDays(row.starts_at, work, company);
       if (parts.length > 1) {
-        if (!confirm(`Main d'œuvre prévue au devis : ${fmtH(work)}.\nL'intervention sera répartie sur ${parts.length} jours :\n${parts.map((p, i) => `• Jour ${i + 1} : ${new Date(p.starts_at).toLocaleString("fr-FR", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })} (${fmtH(p.work)})`).join("\n")}\n\nCréer ces ${parts.length} rendez-vous ?`)) return;
+        if (!confirm(`Main d'œuvre prévue au devis : ${fmtH(work)}.\nL'intervention sera répartie sur ${parts.length} jours :\n${parts.map((p, i) => { const a = new Date(p.starts_at), b = new Date(a.getTime() + p.duration_min * 60000), t = (d: Date) => d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+          return `• Jour ${i + 1} : ${a.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}, ${t(a)} → ${t(b)} = ${fmtH(p.work)} de travail${p.duration_min > p.work ? ` (+ ${fmtH(p.duration_min - p.work)} de pause)` : ""}`; }).join("\n")}${dayHours(company).lunchMin ? "" : "\n\n⚠️ Pas de pause déjeuner réglée (Paramètres → Prise de RDV)."}\n\nCréer ces ${parts.length} rendez-vous ?`)) return;
         const rows = parts.map((p, i) => ({ ...row, starts_at: p.starts_at, duration_min: p.duration_min, title: `${row.title} (jour ${i + 1}/${parts.length})`, ...(i > 0 ? { billable: false, price_ht: null } : {}) }));
         const { error } = await sb().from("interventions").insert(rows);
         if (error) return alert(error.message);
@@ -304,7 +305,7 @@ function Planning() {
             )}
             {!edit.id && edit.document_id && (
               <p className={`rounded-lg p-2 text-xs ${work ? "bg-blue-50 text-blue-900" : "bg-amber-50 text-amber-900"}`}>
-                {work ? <>⏱ Main d'œuvre prévue au devis : <b>{fmtH(work)}</b>{work > dayHours(company).work ? ` → ${splitDays(edit.starts_at, work, company).length} jours de travail (journée de ${fmtH(dayHours(company).work)}), créés automatiquement à l'enregistrement.` : "."}</>
+                {work ? <>⏱ Main d'œuvre prévue au devis : <b>{fmtH(work)}</b>{work > dayHours(company).work ? ` → ${splitDays(edit.starts_at, work, company).length} jours de travail (journée de ${fmtH(dayHours(company).work)} de travail${dayHours(company).lunchMin ? ` + ${fmtH(dayHours(company).lunchMin)} de pause` : ", sans pause déjeuner"}), créés automatiquement à l'enregistrement.` : "."}</>
                   : "Aucune ligne en heures dans ce devis : choisissez la durée à la main."}
               </p>
             )}
