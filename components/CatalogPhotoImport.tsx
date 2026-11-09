@@ -6,7 +6,7 @@ import { VAT_RATES } from "@/lib/calc";
 import type { CatalogItem } from "@/lib/types";
 import { useCompany } from "@/components/CompanyContext";
 
-type Row = { keep: boolean; label: string; ref?: string; brand?: string; unit: string; cost: number | null; pub: number | null; category: string; match?: CatalogItem };
+type Row = { keep: boolean; label: string; description?: string; open?: boolean; ref?: string; brand?: string; unit: string; cost: number | null; pub: number | null; category: string; match?: CatalogItem };
 const toUrl = (b: Blob) => new Promise<string>((ok) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.readAsDataURL(b); });
 const num = (v: any) => { const n = Number(String(v ?? "").replace(",", ".")); return isFinite(n) ? n : 0; };
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -51,7 +51,7 @@ export default function CatalogPhotoImport({ items, onDone, onClose }: { items: 
     const byRef = new Map(items.filter((i) => i.ref).map((i) => [String(i.ref).trim().toUpperCase(), i]));
     setSupplier(data.supplier || ""); setNotes(data.notes || "");
     const n = (v: any) => (v == null || v === "" ? null : num(v));
-    setRows((data.items || []).map((x: any) => ({ keep: x.cost != null || x.public != null, label: x.label || "", ref: x.ref || "", brand: x.brand || "", unit: x.unit || "u",
+    setRows((data.items || []).map((x: any) => ({ keep: x.cost != null || x.public != null, label: x.label || "", description: x.description || "", ref: x.ref || "", brand: x.brand || "", unit: x.unit || "u",
       cost: n(x.cost), pub: n(x.public), category: x.category || "Fournitures",
       match: x.ref ? byRef.get(String(x.ref).trim().toUpperCase()) : undefined })));
   }
@@ -68,10 +68,10 @@ export default function CatalogPhotoImport({ items, onDone, onClose }: { items: 
     let created = 0, updated = 0;
     const news = sel.filter((r) => !r.match).map((r) => ({ category: r.category, label: r.label.trim(), unit: r.unit || "u", unit_price: sale(r), cost_price: cost(r),
       vat_rate: vat, ref: r.ref || null, brand: r.brand || null, public_price: r.pub,
-      description: supplier ? `Fournisseur : ${supplier}` : null }));
+      description: r.description?.trim() || null }));
     if (news.length) { const { error } = await sb().from("catalog_items").insert(news); if (error) { setBusy(""); return setErr(error.message); } created = news.length; }
     for (const r of sel.filter((x) => x.match)) {
-      const { error } = await sb().from("catalog_items").update({ cost_price: cost(r), unit_price: sale(r), ...(r.pub != null ? { public_price: r.pub } : {}), updated_at: new Date().toISOString() }).eq("id", r.match!.id);
+      const { error } = await sb().from("catalog_items").update({ cost_price: cost(r), unit_price: sale(r), ...(r.pub != null ? { public_price: r.pub } : {}), ...(r.description?.trim() ? { description: r.description.trim() } : {}), updated_at: new Date().toISOString() }).eq("id", r.match!.id);
       if (!error) updated++;
     }
     setBusy("");
@@ -113,6 +113,11 @@ export default function CatalogPhotoImport({ items, onDone, onClose }: { items: 
               <div className="flex items-start gap-2">
                 <input type="checkbox" className="mt-2" checked={r.keep} onChange={(e) => setRow(i, { keep: e.target.checked })} />
                 <textarea className="input flex-1 !py-1 text-sm" rows={2} value={r.label} onChange={(e) => setRow(i, { label: e.target.value })} />
+              </div>
+              <div className="pl-6">
+                {r.open
+                  ? <textarea className="input text-xs" rows={5} placeholder="Description (reprise sur vos devis)" value={r.description || ""} onChange={(e) => setRow(i, { description: e.target.value })} />
+                  : <button type="button" className="w-full text-left text-xs text-slate-500" onClick={() => setRow(i, { open: true })}>{r.description ? <><span className="line-clamp-2">{r.description}</span><span className="text-brand">✏️ Voir / modifier la description</span></> : <span className="text-brand">＋ Ajouter une description</span>}</button>}
               </div>
               <div className="grid grid-cols-4 gap-1 pl-6">
                 <label className="text-[10px] text-slate-500">Réf.<input className="input !px-2 !py-1 text-xs" value={r.ref || ""} onChange={(e) => setRow(i, { ref: e.target.value })} /></label>

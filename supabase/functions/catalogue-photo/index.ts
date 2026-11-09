@@ -28,7 +28,8 @@ async function subscriptionOk(req: Request): Promise<boolean> {
 
 const PROMPT = `Tu lis des photos de pages de catalogue fournisseur, de tarifs, d'étiquettes de prix, de tickets de comptoir ou de factures d'un grossiste en plomberie / chauffage / sanitaire (France).
 Extrais CHAQUE article lisible avec son prix. N'invente rien : si une information est illisible, laisse-la vide (prix : null).
-- "label" : désignation claire et complète en français (type d'article, dimensions, caractéristiques utiles), sans la marque en double.
+- "label" : désignation courte et claire en français : nom du produit + variante (dimensions, couleur, finition…), sans la marque en double.
+- "description" : le texte descriptif COMPLET du produit tel qu'il est imprimé sur la page (matière, forme, finition, caractéristiques, contenance, ce qui est inclus ou non, garantie, points « Le + »…), reformulé proprement en phrases ou tirets, sans les prix, les codes internes ni l'éco-participation. Répète cette description pour chaque variante du même produit, en y ajoutant ce qui est propre à la variante.
 - "ref" : référence fabricant ou fournisseur exactement comme écrite.
 - "brand" : marque si visible.
 - "unit" : u, m, ml, m², kg, l, lot, rouleau, boîte... (u par défaut).
@@ -38,7 +39,7 @@ Extrais CHAQUE article lisible avec son prix. N'invente rien : si une informatio
 - "category" : une parmi Chauffage, Sanitaire, Plomberie, Raccords, Évacuation, Robinetterie, Électricité, Outillage, Fournitures.
 - Un même article décliné en plusieurs tailles = une ligne par taille (avec sa référence et son prix).
 Réponds UNIQUEMENT avec un JSON, sans texte autour :
-{"supplier":"nom du fournisseur ou du catalogue si visible","items":[{"label":"","ref":"","brand":"","unit":"u","cost":null,"public":0,"category":"Plomberie"}],"notes":"remarque utile (pages floues, prix manquants, consigne appliquée…)"}`;
+{"supplier":"nom du fournisseur ou du catalogue si visible","items":[{"label":"","description":"","ref":"","brand":"","unit":"u","cost":null,"public":0,"category":"Plomberie"}],"notes":"remarque utile (pages floues, prix manquants, consigne appliquée…)"}`;
 
 function extractJson(txt: string): any | null {
   const t = txt.replace(/```(?:json)?/g, "");
