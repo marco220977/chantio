@@ -7,6 +7,9 @@ import { eur, VAT_RATES } from "@/lib/calc";
 import Header from "@/components/Header";
 import Modal from "@/components/Modal";
 import KitEditor from "@/components/KitEditor";
+import CatalogPhotoImport from "@/components/CatalogPhotoImport";
+import { useCompany } from "@/components/CompanyContext";
+import { useRouter } from "next/navigation";
 import type { CatalogItem } from "@/lib/types";
 
 const STARTER: Omit<CatalogItem, "id">[] = [
@@ -109,6 +112,9 @@ function Catalogue() {
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("all");
   const [msg, setMsg] = useState("");
+  const [photo, setPhoto] = useState(false);
+  const { has } = useCompany();
+  const router = useRouter();
   const load = () => sb().from("catalog_items").select("*").is("supplier", null).order("category").order("label").then(({ data }) => setItems(data || []));
   useEffect(() => { load(); }, []);
 
@@ -148,6 +154,8 @@ function Catalogue() {
           </div>
         )}
         {msg && <p className="rounded-xl bg-green-50 p-3 text-sm text-green-800">{msg}</p>}
+        <button className="btn-brand w-full" onClick={() => has("ia") ? setPhoto(true) : confirm("L'ajout d'articles par photo (IA) est inclus dans les formules Pro et Équipe. Voir les formules ?") && router.push("/app/abonnement")}>
+          {has("ia") ? "📷 Ajouter des articles depuis une photo (IA)" : "🔒 Ajouter depuis une photo — formule Pro"}</button>
         {items.length > 0 && <input className="input" placeholder={`Rechercher parmi ${items.length} articles…`} value={q} onChange={(e) => setQ(e.target.value)} />}
         {items.length > 0 && (
           <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1">
@@ -176,6 +184,11 @@ function Catalogue() {
         })}
         </>}
       </div>
+      {photo && (
+        <Modal title="📷 Articles depuis une photo" onClose={() => setPhoto(false)}>
+          <CatalogPhotoImport items={items} onClose={() => setPhoto(false)} onDone={(m) => { setPhoto(false); setMsg(m); load(); }} />
+        </Modal>
+      )}
       {edit && (
         <Modal title={edit.id ? "Modifier l'article" : "Nouvel article"} onClose={() => setEdit(null)}>
           <div className="space-y-3">

@@ -8,13 +8,13 @@ export const TIERS: Record<Tier, { name: string; price: number; users: number; f
   solo: { name: "Solo", price: 29, users: 1, features: [], tagline: "L'essentiel pour l'artisan seul",
     includes: ["Devis, factures, avoirs illimités", "Signature électronique sur place et à distance", "Facture électronique 2026 (Factur-X)", "Clients, catalogue, import des tarifs fournisseurs", "Planning et quitus d'intervention", "Paiement en ligne, relances automatiques", "Chiffre d'affaires, TVA, export comptable", "1 utilisateur"] },
   pro: { name: "Pro", price: 49, users: 2, features: ["ia", "entretien", "agenda"], tagline: "Pour le chauffagiste qui veut gagner du temps",
-    includes: ["Tout Solo", "🤖 IA : devis dictés, scan de plaque, diagnostic de panne", "🛠 Entretien et SAV : contrats, attestations, rappels, codes erreur", "📲 Prise de RDV en ligne avec trajets optimisés", "2 utilisateurs"] },
+    includes: ["Tout Solo", "🤖 IA : devis dictés, scan de plaque, diagnostic de panne, catalogue par photo", "🛠 Entretien et SAV : contrats, attestations, rappels, codes erreur", "📲 Prise de RDV en ligne avec trajets optimisés", "2 utilisateurs"] },
   equipe: { name: "Équipe", price: 79, users: 4, features: ["ia", "entretien", "agenda", "chantiers"], tagline: "Pour l'entreprise avec des techniciens",
     includes: ["Tout Pro", "🏗 Suivi de chantier : journal photo et vidéo", "👷 Planning d'équipe : patron + 3 techniciens", "4 utilisateurs"] },
 };
 
 export const FEATURE_LABEL: Record<Feature, string> = {
-  ia: "L'intelligence artificielle (devis IA, scan de plaque, diagnostic)",
+  ia: "L'intelligence artificielle (devis IA, scan de plaque, diagnostic, catalogue par photo)",
   entretien: "Les contrats d'entretien, attestations, SAV et codes erreur",
   agenda: "La prise de rendez-vous en ligne par les clients",
   chantiers: "Le suivi de chantier",
